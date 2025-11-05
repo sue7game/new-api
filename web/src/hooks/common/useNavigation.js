@@ -49,6 +49,11 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         itemKey: 'pricing',
         to: '/pricing',
       },
+            {
+        text: t('关于'),
+        itemKey: 'about',
+        to: '/about',
+      },
       ...(docsLink
         ? [
             {
@@ -59,11 +64,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
             },
           ]
         : []),
-      {
-        text: t('关于'),
-        itemKey: 'about',
-        to: '/about',
-      },
+
     ];
 
     // 根据配置过滤导航链接

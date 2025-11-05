@@ -188,26 +188,18 @@ const FooterBar = () => {
           </div>
         )}
 
-        <div className='flex flex-col md:flex-row items-center justify-between w-full max-w-[1110px] gap-6'>
-          <div className='flex flex-wrap items-center gap-2'>
+        <div className='flex flex-col items-center justify-center w-full max-w-[1110px] gap-2 py-4'>
+          {/* 原有版权信息 - 水平居中 */}
+          <div className='flex flex-wrap items-center gap-2 justify-center'>
             <Typography.Text className='text-sm !text-semi-color-text-1'>
               © {currentYear} {systemName}. {t('版权所有')}
             </Typography.Text>
           </div>
-
-          <div className='text-sm'>
-            <span className='!text-semi-color-text-1'>
-              {t('设计与开发由')}{' '}
-            </span>
-            <a
-              href='https://github.com/QuantumNous/new-api'
-              target='_blank'
-              rel='noopener noreferrer'
-              className='!text-semi-color-primary font-medium'
-            >
-              New API
-            </a>
-          </div>
+          
+          {/* 新增小字提示 - 居中显示在版权下方 */}
+          <Typography.Text className='text-xs !text-semi-color-text-2 mt-1'>
+            本站API适用于测试和体验目的，请自觉遵守您当地法律法规，切勿用于非法用途，本站不承担任何法律责任。
+          </Typography.Text>
         </div>
       </footer>
     ),
@@ -234,7 +226,7 @@ const FooterBar = () => {
               rel='noopener noreferrer'
               className='!text-semi-color-primary font-medium'
             >
-              New 221API111
+             
             </a>
           </div>
         </div>
