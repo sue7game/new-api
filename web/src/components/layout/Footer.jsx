@@ -234,7 +234,7 @@ const FooterBar = () => {
               rel='noopener noreferrer'
               className='!text-semi-color-primary font-medium'
             >
-              New 1API111
+              New 221API111
             </a>
           </div>
         </div>
