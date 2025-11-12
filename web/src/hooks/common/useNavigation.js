@@ -28,6 +28,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
       pricing: true,
       docs: true,
       about: true,
+      pay: true, // 新增：默认显示“商城”导航
     };
 
     // 使用传入的配置或默认配置
@@ -64,6 +65,15 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
             },
           ]
         : []),
+
+              // 新增：商城导航项（位置可调整，比如想放最后就移到 about 后面）
+        {
+          text: t('商城'),
+          itemKey: 'pay',
+          isExternal: true, // 关键：外部链接标记
+          externalLink: 'https://query.aiday.top/mall', // 替换成你的指定链接
+          target: '_blank', // 新窗口打开（可选，默认新窗口）
+        },
 
     ];
 

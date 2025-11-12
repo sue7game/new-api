@@ -85,6 +85,17 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    port: 8080, // 新增：固定前端开发端口（避免每次启动变端口，方便访问）
+    hmr: {
+      enabled: true, // 强制开启热更新（关键）
+      host: 'localhost', // 热更新服务地址（和前端访问地址一致）
+      port: 8081, // 热更新独立端口（避免和前端/后端端口冲突，可选默认）
+    },
+    watch: {
+      // 新增：确保监听所有前端文件变化（防止漏监）
+      include: ['src/**/*.vue', 'src/**/*.jsx', 'src/**/*.js', 'src/**/*.css'],
+      ignore: ['node_modules', 'dist'],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3000',

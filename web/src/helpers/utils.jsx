@@ -50,7 +50,10 @@ export function getSystemName() {
 
   //return 'AI Day';
   let system_name = localStorage.getItem('system_name');
-  if (!system_name) return 'AIDay';
+  if(system_name && system_name == 'New API'){
+    return 'AIDay API'; 
+  }
+  if (!system_name) return 'AIDay API';
   return system_name;
 }
 
