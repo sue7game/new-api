@@ -35,11 +35,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
     const modules = headerNavModules || defaultModules;
 
     const allLinks = [
-      {
-        text: t('首页'),
-        itemKey: 'home',
-        to: '/',
-      },
+
       {
         text: t('控制台'),
         itemKey: 'console',
@@ -74,6 +70,12 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
           externalLink: 'https://query.aiday.top/mall', // 替换成你的指定链接
           target: '_blank', // 新窗口打开（可选，默认新窗口）
         },
+
+      {
+        text: t('首页'),
+        itemKey: 'home',
+        to: '/',
+      },
 
     ];
 
