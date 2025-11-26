@@ -23,3 +23,6 @@ electron/node_modules
 electron/dist
 .env
 web/dist/
+.env
+docker-compose.yml
+new-api-linux
