@@ -182,6 +182,48 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		logger.LogError(c, "error processing tokens: "+err.Error())
 	}
 
+	if !isAudioModel && !containStreamUsage && len(streamItems) > 0 {
+		var fullContent strings.Builder // 拼接所有有效Content
+		// 正序遍历所有分片（而非倒序），拼接所有有效Content
+		for i := 0; i < len(streamItems); i++ {
+			item := streamItems[i]
+			if strings.TrimSpace(item) == "" {
+				continue
+			}
+
+			var chunk dto.ChatCompletionsStreamResponse
+			if err := common.UnmarshalJsonStr(item, &chunk); err != nil {
+				continue
+			}
+
+			for _, choice := range chunk.Choices {
+				if choice.Index != 0 {
+					continue
+				}
+				// 提取并清洗每个分片的Content
+				content := strings.TrimSpace(choice.Delta.GetContentString())
+				content = strings.ReplaceAll(content, "**", "")
+				// 拼接非空Content
+				if content != "" {
+					fullContent.WriteString(content)
+					fmt.Printf("[拼接Content] 分片%d | 添加Content：%q | 累计拼接：%q\n", i, content, fullContent.String())
+				}
+			}
+		}
+
+		// 空内容兜底
+		finalContent := fullContent.String()
+		if finalContent == "" {
+			finalContent = "（无有效回复内容）"
+		}
+
+		// 覆盖responseTextBuilder
+		responseTextBuilder.Reset()
+		responseTextBuilder.WriteString(finalContent)
+		fmt.Printf("[完整回复最终结果] finalContent：%q | 长度：%d | 字符数：%d\n",
+			finalContent, len(finalContent), len([]rune(finalContent)))
+	}
+
 	if !containStreamUsage {
 		usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.PromptTokens)
 		usage.CompletionTokens += toolCount * 7
@@ -207,12 +249,18 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	}
 	// Unmarshal to simpleResponse
 	if info.ChannelType == constant.ChannelTypeOpenRouter && info.ChannelOtherSettings.IsOpenRouterEnterprise() {
+		// 新增：打印OpenRouter企业版解析前信息
+		fmt.Printf("[OpenaiHandler] 开始解析OpenRouter企业版响应 | ChannelType=%d | IsOpenRouterEnterprise=%t\n",
+			info.ChannelType, info.ChannelOtherSettings.IsOpenRouterEnterprise())
 		// 尝试解析为 openrouter enterprise
 		var enterpriseResponse openrouter.OpenRouterEnterpriseResponse
 		err = common.Unmarshal(responseBody, &enterpriseResponse)
 		if err != nil {
 			return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 		}
+		// 新增：打印OpenRouter企业版解析结果
+		fmt.Printf("[OpenaiHandler] OpenRouter企业版解析结果 | Success=%t | Data长度=%d\n",
+			enterpriseResponse.Success, len(enterpriseResponse.Data))
 		if enterpriseResponse.Success {
 			responseBody = enterpriseResponse.Data
 		} else {
@@ -236,24 +284,47 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	}
 
 	usageModified := false
+	// 新增：打印进入Token计算分支前的关键信息
+	fmt.Printf("[OpenaiHandler] 准备判断Token计算条件 | PromptTokens=%d | CompletionTokens=%d | Choices长度=%d | 模型名=%s\n",
+		simpleResponse.Usage.PromptTokens, simpleResponse.Usage.CompletionTokens, len(simpleResponse.Choices), info.UpstreamModelName)
+
 	if simpleResponse.Usage.PromptTokens == 0 {
+		// 新增：打印进入Token计算分支
+		fmt.Println("[OpenaiHandler] 进入Token计算分支（PromptTokens==0）")
 		completionTokens := simpleResponse.Usage.CompletionTokens
 		if completionTokens == 0 {
-			for _, choice := range simpleResponse.Choices {
-				ctkm := service.CountTextToken(choice.Message.StringContent()+choice.Message.ReasoningContent+choice.Message.Reasoning, info.UpstreamModelName)
+			// 新增：打印开始遍历Choices计算Token
+			fmt.Printf("[OpenaiHandler] CompletionTokens==0，开始遍历Choices（共%d个）计算Token\n", len(simpleResponse.Choices))
+			for idx, choice := range simpleResponse.Choices {
+				// 新增：打印每个Choice的原始内容
+				content := choice.Message.StringContent() + choice.Message.ReasoningContent + choice.Message.Reasoning
+				fmt.Printf("[OpenaiHandler] 遍历Choice[%d] | 内容长度=%d | 内容前100字符：%s\n",
+					idx, len(content), string([]rune(content)[:min(len(content), 100)]))
+				// 原计算逻辑
+				ctkm := service.CountTextToken(content, info.UpstreamModelName)
+				// 新增：打印每个Choice计算的Token数
+				fmt.Printf("[OpenaiHandler] Choice[%d] 计算Token数：%d\n", idx, ctkm)
 				completionTokens += ctkm
 			}
+			// 新增：打印遍历完成后的累计Token数
+			fmt.Printf("[OpenaiHandler] 遍历Choices完成，累计CompletionTokens：%d\n", completionTokens)
 		}
+		// 原赋值逻辑
 		simpleResponse.Usage = dto.Usage{
 			PromptTokens:     info.PromptTokens,
 			CompletionTokens: completionTokens,
 			TotalTokens:      info.PromptTokens + completionTokens,
 		}
+		// 新增：打印Token计算完成后的结果
+		fmt.Printf("[OpenaiHandler] Token计算完成 | PromptTokens=%d | CompletionTokens=%d | TotalTokens=%d\n",
+			simpleResponse.Usage.PromptTokens, simpleResponse.Usage.CompletionTokens, simpleResponse.Usage.TotalTokens)
 		usageModified = true
 	}
 
 	applyUsagePostProcessing(info, &simpleResponse.Usage, responseBody)
 
+	// 新增：打印格式转换前信息
+	fmt.Printf("[OpenaiHandler] 准备转换响应格式 | RelayFormat=%d | usageModified=%t\n", info.RelayFormat, usageModified)
 	switch info.RelayFormat {
 	case types.RelayFormatOpenAI:
 		if usageModified {
@@ -289,9 +360,21 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 		responseBody = geminiRespStr
 	}
 
+	// 新增：打印响应返回前的最终Usage
+	fmt.Printf("[OpenaiHandler] 响应返回前最终Usage | PromptTokens=%d | CompletionTokens=%d | TotalTokens=%d\n",
+		simpleResponse.Usage.PromptTokens, simpleResponse.Usage.CompletionTokens, simpleResponse.Usage.TotalTokens)
+
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
 	return &simpleResponse.Usage, nil
+}
+
+// 新增：辅助函数（避免切片越界，仅新增，无逻辑修改）
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func streamTTSResponse(c *gin.Context, resp *http.Response) {
