@@ -26,3 +26,4 @@ web/dist/
 .env
 docker-compose.yml
 new-api-linux
+daemon.json
