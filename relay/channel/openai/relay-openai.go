@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -182,7 +183,10 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		logger.LogError(c, "error processing tokens: "+err.Error())
 	}
 
+	// 新增：标记是否进入本地统计分支（仅用于发送结束信号）
+	isCustomTokenCalc := false
 	if !isAudioModel && !containStreamUsage && len(streamItems) > 0 {
+		isCustomTokenCalc = true        // 仅标记，不修改原有清洗/兜底逻辑
 		var fullContent strings.Builder // 拼接所有有效Content
 		// 正序遍历所有分片（而非倒序），拼接所有有效Content
 		for i := 0; i < len(streamItems); i++ {
@@ -200,36 +204,47 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 				if choice.Index != 0 {
 					continue
 				}
-				// 提取并清洗每个分片的Content
+				// 提取并清洗每个分片的Content（仅新增：轻微过滤---，不导致内容为空）
 				content := strings.TrimSpace(choice.Delta.GetContentString())
 				content = strings.ReplaceAll(content, "**", "")
-				// 拼接非空Content
+				// 新增：仅过滤连续≥5个的---（避免前端显示长串，保留短横线），不修剪首尾
+				content = regexp.MustCompile(`-{5,}`).ReplaceAllString(content, "")
+				// 拼接非空Content（保留你原有逻辑）
 				if content != "" {
 					fullContent.WriteString(content)
-					//fmt.Printf("[拼接Content] 分片%d | 添加Content：%q | 累计拼接：%q\n", i, content, fullContent.String())
 				}
 			}
 		}
 
-		// 空内容兜底
+		// 空内容兜底（保留你原有逻辑：非空字符串，避免token=0）
 		finalContent := fullContent.String()
 		if finalContent == "" {
 			finalContent = "（无有效回复内容）"
 		}
 
-		// 覆盖responseTextBuilder
+		// 覆盖responseTextBuilder（保留你原有逻辑）
 		responseTextBuilder.Reset()
 		responseTextBuilder.WriteString(finalContent)
-		/*fmt.Printf("[完整回复最终结果] finalContent：%q | 长度：%d | 字符数：%d\n",
-		finalContent, len(finalContent), len([]rune(finalContent)))*/
 	}
 
 	if !containStreamUsage {
+		// 保留你原有逻辑：token计算不会为0
 		usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.PromptTokens)
 		usage.CompletionTokens += toolCount * 7
 	}
 
 	applyUsagePostProcessing(info, usage, nil)
+
+	// 新增：仅在本地统计分支触发时，发送SSE结束信号（解决前端卡住，不影响token）
+	if isCustomTokenCalc && info.RelayFormat == types.RelayFormatOpenAI {
+		// 发送OpenAI标准结束信号，强制终止前端流
+		doneData := "data: [DONE]\n\n"
+		_, err := c.Writer.WriteString(doneData)
+		if err != nil {
+			logger.LogError(c, fmt.Sprintf("发送SSE结束信号失败：%s", err.Error()))
+		}
+		c.Writer.Flush() // 强制刷出，确保信号立即发送
+	}
 
 	HandleFinalResponse(c, info, lastStreamData, responseId, createAt, model, systemFingerprint, usage, containStreamUsage)
 
