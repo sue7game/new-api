@@ -228,8 +228,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	}
 
 	if !containStreamUsage {
-		// 保留你原有逻辑：token计算不会为0
-		usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.PromptTokens)
+		usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 		usage.CompletionTokens += toolCount * 7
 	}
 
@@ -326,9 +325,9 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 		}
 		// 原赋值逻辑
 		simpleResponse.Usage = dto.Usage{
-			PromptTokens:     info.PromptTokens,
+			PromptTokens:     info.GetEstimatePromptTokens(),
 			CompletionTokens: completionTokens,
-			TotalTokens:      info.PromptTokens + completionTokens,
+			TotalTokens:      info.GetEstimatePromptTokens() + completionTokens,
 		}
 		// 新增：打印Token计算完成后的结果
 		/*fmt.Printf("[OpenaiHandler] Token计算完成 | PromptTokens=%d | CompletionTokens=%d | TotalTokens=%d\n",
@@ -434,8 +433,8 @@ func OpenaiTTSHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 	// and can be terminated directly.
 	defer service.CloseResponseBodyGracefully(resp)
 	usage := &dto.Usage{}
-	usage.PromptTokens = info.PromptTokens
-	usage.TotalTokens = info.PromptTokens
+	usage.PromptTokens = info.GetEstimatePromptTokens()
+	usage.TotalTokens = info.GetEstimatePromptTokens()
 	for k, v := range resp.Header {
 		c.Writer.Header().Set(k, v[0])
 	}
@@ -481,7 +480,7 @@ func OpenaiSTTHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 	}
 
 	usage := &dto.Usage{}
-	usage.PromptTokens = info.PromptTokens
+	usage.PromptTokens = info.GetEstimatePromptTokens()
 	usage.CompletionTokens = 0
 	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 	return nil, usage
