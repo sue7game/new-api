@@ -48,7 +48,7 @@ export function isRoot() {
 
 export function getSystemName() {
 
-  //return 'AI Day';
+  return '生活AI';
   let system_name = localStorage.getItem('system_name');
   if(system_name && system_name == 'New API'){
     return 'AIDay API'; 

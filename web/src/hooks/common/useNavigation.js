@@ -72,9 +72,11 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         },
 
       {
-        text: t('首页'),
+        text: t('香蕉生图'),
         itemKey: 'home',
-        to: '/',
+          isExternal: true, // 关键：外部链接标记
+          externalLink: 'https://ai.keloveann.com', // 替换成你的指定链接
+          target: '_blank', // 新窗口打开（可选，默认新窗口）
       },
 
     ];
