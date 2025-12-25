@@ -177,6 +177,10 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 func claudePassThrough(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ClaudeRequest) (newAPIError *types.NewAPIError) {
 
 	fmt.Println("===== Claude PassThrough claudePassThrough222 =====")
+
+	// Map model to upstream variant while keeping raw body untouched.
+	_ = helper.ModelMappedHelper(c, info, nil)
+
 	rawBody, err := common.GetRequestBody(c)
 	if err != nil {
 		return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
@@ -185,7 +189,20 @@ func claudePassThrough(c *gin.Context, info *relaycommon.RelayInfo, request *dto
 		info.IsStream = true
 	}
 
-	logger.LogInfo(c, fmt.Sprintf("claude passthrough start: channel=%d stream=%t url=%s", info.ChannelId, info.IsStream, claudePassthroughURL))
+	//logger.LogInfo(c, fmt.Sprintf("claude passthrough start: channel=%d stream=%t url=%s origin_model=%s upstream_model=%s", info.ChannelId, info.IsStream, claudePassthroughURL, info.OriginModelName, info.UpstreamModelName))
+
+	if info.UpstreamModelName != "" && info.UpstreamModelName != info.OriginModelName {
+		var payload map[string]any
+		if err := common.Unmarshal(rawBody, &payload); err == nil {
+			if payload["model"] != nil {
+				payload["model"] = info.UpstreamModelName
+				if patched, err := common.Marshal(payload); err == nil {
+					rawBody = patched
+					//logger.LogInfo(c, fmt.Sprintf("claude passthrough model patched to upstream_model=%s", info.UpstreamModelName))
+				}
+			}
+		}
+	}
 
 	req, err := http.NewRequest(c.Request.Method, claudePassthroughURL, bytes.NewBuffer(rawBody))
 	if err != nil {
@@ -203,7 +220,7 @@ func claudePassThrough(c *gin.Context, info *relaycommon.RelayInfo, request *dto
 
 	statusCodeMappingStr := c.GetString("status_code_mapping")
 	info.IsStream = info.IsStream || strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
-	logger.LogInfo(c, fmt.Sprintf("claude passthrough upstream status: %d stream=%t", resp.StatusCode, info.IsStream))
+	//logger.LogInfo(c, fmt.Sprintf("claude passthrough upstream status: %d stream=%t", resp.StatusCode, info.IsStream))
 
 	if resp.StatusCode != http.StatusOK {
 		errorBody, _ := io.ReadAll(resp.Body)
@@ -366,6 +383,6 @@ func shouldClaudePassThrough(info *relaycommon.RelayInfo) bool {
 		return true
 	}
 	base := strings.TrimSuffix(strings.TrimSpace(info.ChannelBaseUrl), "/")
-	fmt.Println("===== Claude PassThrough Base URL =====", base)
+	//fmt.Println("===== Claude PassThrough Base URL =====", base)
 	return base == claudePassthroughURL
 }
