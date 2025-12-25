@@ -11,7 +11,6 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
-	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/relay/channel"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
@@ -176,8 +175,6 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 
 func claudePassThrough(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ClaudeRequest) (newAPIError *types.NewAPIError) {
 
-	fmt.Println("===== Claude PassThrough claudePassThrough222 =====")
-
 	// Map model to upstream variant while keeping raw body untouched.
 	_ = helper.ModelMappedHelper(c, info, nil)
 
@@ -189,8 +186,6 @@ func claudePassThrough(c *gin.Context, info *relaycommon.RelayInfo, request *dto
 		info.IsStream = true
 	}
 
-	//logger.LogInfo(c, fmt.Sprintf("claude passthrough start: channel=%d stream=%t url=%s origin_model=%s upstream_model=%s", info.ChannelId, info.IsStream, claudePassthroughURL, info.OriginModelName, info.UpstreamModelName))
-
 	if info.UpstreamModelName != "" && info.UpstreamModelName != info.OriginModelName {
 		var payload map[string]any
 		if err := common.Unmarshal(rawBody, &payload); err == nil {
@@ -198,7 +193,6 @@ func claudePassThrough(c *gin.Context, info *relaycommon.RelayInfo, request *dto
 				payload["model"] = info.UpstreamModelName
 				if patched, err := common.Marshal(payload); err == nil {
 					rawBody = patched
-					//logger.LogInfo(c, fmt.Sprintf("claude passthrough model patched to upstream_model=%s", info.UpstreamModelName))
 				}
 			}
 		}
@@ -220,8 +214,6 @@ func claudePassThrough(c *gin.Context, info *relaycommon.RelayInfo, request *dto
 
 	statusCodeMappingStr := c.GetString("status_code_mapping")
 	info.IsStream = info.IsStream || strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
-	//logger.LogInfo(c, fmt.Sprintf("claude passthrough upstream status: %d stream=%t", resp.StatusCode, info.IsStream))
-
 	if resp.StatusCode != http.StatusOK {
 		errorBody, _ := io.ReadAll(resp.Body)
 		info.SetFirstResponseTime()
@@ -242,9 +234,6 @@ func claudePassThrough(c *gin.Context, info *relaycommon.RelayInfo, request *dto
 	}
 
 	service.PostClaudeConsumeQuota(c, info, usage)
-	latencyMs := info.FirstResponseTime.Sub(info.StartTime).Milliseconds()
-	logger.LogInfo(c, fmt.Sprintf("claude passthrough usage: prompt=%d completion=%d total=%d latency_ms=%d",
-		usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens, latencyMs))
 	return nil
 }
 
@@ -284,7 +273,6 @@ func handleClaudePassThroughStream(c *gin.Context, resp *http.Response, info *re
 		line := scanner.Text()
 		if firstChunk {
 			info.SetFirstResponseTime()
-			logger.LogInfo(c, "claude passthrough stream: first chunk received")
 			firstChunk = false
 		}
 
