@@ -23,6 +23,7 @@ import (
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/shopspring/decimal"
+	"github.com/tidwall/sjson"
 
 	"github.com/gin-gonic/gin"
 )
@@ -76,9 +77,11 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	adaptor.Init(info)
 
 	passThroughGlobal := model_setting.GetGlobalSettings().PassThroughRequestEnabled
+	passThroughContent := info.ChannelSetting.PassThroughContentEnabled
 	if info.RelayMode == relayconstant.RelayModeChatCompletions &&
 		!passThroughGlobal &&
 		!info.ChannelSetting.PassThroughBodyEnabled &&
+		!passThroughContent &&
 		shouldChatCompletionsViaResponses(info) {
 		applySystemPromptIfNeeded(c, info, request)
 		usage, newApiErr := chatCompletionsViaResponses(c, info, adaptor, request)
@@ -100,6 +103,8 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	var requestBody io.Reader
 
 	if passThroughGlobal || info.ChannelSetting.PassThroughBodyEnabled {
+
+		//fmt.Println("[TextHelper] 进入分支：passThroughGlobal/PassThroughBodyEnabled")
 		body, err := common.GetRequestBody(c)
 		if err != nil {
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
@@ -108,7 +113,40 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 			println("requestBody: ", string(body))
 		}
 		requestBody = bytes.NewBuffer(body)
+	} else if passThroughContent {
+
+		//fmt.Println("[TextHelper] 进入分支：passThroughContent22222222222")
+		body, err := common.GetRequestBody(c)
+		if err != nil {
+			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		}
+
+		// 仅改写必要字段：模型重定向 / 字段透传控制 / 参数覆写
+		if info.UpstreamModelName != "" {
+			body, err = sjson.SetBytes(body, "model", info.UpstreamModelName)
+			if err != nil {
+				return types.NewErrorWithStatusCode(err, types.ErrorCodeBadRequestBody, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+			}
+		}
+
+		// remove disabled fields for OpenAI API
+		body, err = relaycommon.RemoveDisabledFields(body, info.ChannelOtherSettings)
+		if err != nil {
+			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
+		}
+
+		// apply param override
+		if len(info.ParamOverride) > 0 {
+			body, err = relaycommon.ApplyParamOverride(body, info.ParamOverride, relaycommon.BuildParamOverrideContext(info))
+			if err != nil {
+				return types.NewError(err, types.ErrorCodeChannelParamOverrideInvalid, types.ErrOptionWithSkipRetry())
+			}
+		}
+
+		logger.LogDebug(c, fmt.Sprintf("text request pass-through content body: %s", string(body)))
+		requestBody = bytes.NewBuffer(body)
 	} else {
+		//fmt.Println("[TextHelper] 2343555555555555555555555")
 		convertedRequest, err := adaptor.ConvertOpenAIRequest(c, info, request)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
