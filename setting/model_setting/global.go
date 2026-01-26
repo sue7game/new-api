@@ -13,6 +13,9 @@ type ChatCompletionsToResponsesPolicy struct {
 	ChannelIDs    []int    `json:"channel_ids,omitempty"`
 	ChannelTypes  []int    `json:"channel_types,omitempty"`
 	ModelPatterns []string `json:"model_patterns,omitempty"`
+	// ModelThings is a pair list: [model1, effort1, model2, effort2, ...]
+	// It is used to inject default reasoning_effort when ChatCompletions is converted to Responses.
+	ModelThings []string `json:"model_things,omitempty"`
 }
 
 func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channelType int) bool {
@@ -30,6 +33,35 @@ func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channe
 		return true
 	}
 	return false
+}
+
+func (p ChatCompletionsToResponsesPolicy) GetDefaultReasoningEffort(model string) string {
+	target := strings.TrimSpace(model)
+	if target == "" {
+		return ""
+	}
+
+	var found string
+	for i := 0; i+1 < len(p.ModelThings); i += 2 {
+		m := strings.TrimSpace(p.ModelThings[i])
+		e := strings.ToLower(strings.TrimSpace(p.ModelThings[i+1]))
+		if m == "" || e == "" {
+			continue
+		}
+		if m != target {
+			continue
+		}
+		switch e {
+		case "high", "medium", "low", "minimal", "none", "xhigh":
+			found = e
+		default:
+			// ignore invalid effort values
+		}
+	}
+	if found == "none" {
+		return ""
+	}
+	return found
 }
 
 type GlobalSettings struct {

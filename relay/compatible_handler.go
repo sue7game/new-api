@@ -85,6 +85,24 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 		!passThroughContent &&
 		service.ShouldChatCompletionsUseResponsesGlobal(info.ChannelId, info.ChannelType, info.OriginModelName) {
 
+		// Inject default reasoning effort only in ChatCompletions→Responses compatibility mode.
+		// When the client explicitly sets reasoning_effort to a non-none value, keep it.
+		// When the client omits reasoning_effort or sets it to "none", allow policy-based override.
+		if request.ReasoningEffort == "" || request.ReasoningEffort == "none" {
+
+			//fmt.Printf("11111当前ReasoningEffort参数值为：%s\n", request.ReasoningEffort)
+			policy := model_setting.GetGlobalSettings().ChatCompletionsToResponsesPolicy
+			if effort := policy.GetDefaultReasoningEffort(info.OriginModelName); effort != "" {
+				request.ReasoningEffort = effort
+			} else if effort := policy.GetDefaultReasoningEffort(request.Model); effort != "" {
+				// best-effort fallback for model-mapped scenarios
+				request.ReasoningEffort = effort
+			}
+		} else {
+
+			//fmt.Printf("2222当前ReasoningEffort参数值为：%s\n", request.ReasoningEffort)
+		}
+		//fmt.Printf("3333333当前ReasoningEffort参数值为：%s\n", request.ReasoningEffort)
 		applySystemPromptIfNeeded(c, info, request)
 		usage, newApiErr := chatCompletionsViaResponses(c, info, adaptor, request)
 		if newApiErr != nil {
