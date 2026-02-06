@@ -57,9 +57,12 @@ func formatUserLogs(logs []*Log) {
 		var otherMap map[string]interface{}
 		otherMap, _ = common.StrToMap(logs[i].Other)
 		if otherMap != nil {
-			// Remove admin-only debug fields.
+			// 移除仅管理员可见的调试字段
 			delete(otherMap, "admin_info")
 			delete(otherMap, "reject_reason")
+			// 移除模型重定向/映射痕迹字段（用户侧日志脱敏）
+			delete(otherMap, "is_model_mapped")
+			delete(otherMap, "upstream_model_name")
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
 		logs[i].Id = logs[i].Id % 1024
