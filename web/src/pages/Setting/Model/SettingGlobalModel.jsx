@@ -51,7 +51,7 @@ const chatCompletionsToResponsesPolicyExample = JSON.stringify(
     channel_ids: [1, 2],
     channel_types: [1],
     model_patterns: ['^gpt-4o.*$', '^gpt-5.*$'],
-    model_things: ['gpt-5', 'high', 'gpt-5.1', 'high'],
+    model_things: ['gpt-5', 'high', 'gpt-5.1', 'high','gpt-5.2', 'high'],
   },
   null,
   2,

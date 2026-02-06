@@ -67,7 +67,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
           text: t('商城'),
           itemKey: 'pay',
           isExternal: true, // 关键：外部链接标记
-          externalLink: 'https://query.aiday.top/mall', // 替换成你的指定链接
+          externalLink: 'https://mall.aiday.top', // 替换成你的指定链接
           target: '_blank', // 新窗口打开（可选，默认新窗口）
         },
 
@@ -75,7 +75,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         text: t('香蕉生图'),
         itemKey: 'home',
           isExternal: true, // 关键：外部链接标记
-          externalLink: 'https://ai.heiguo.ltd', // 替换成你的指定链接
+          externalLink: 'https://image.aiday.top', // 替换成你的指定链接
           target: '_blank', // 新窗口打开（可选，默认新窗口）
       },
 
