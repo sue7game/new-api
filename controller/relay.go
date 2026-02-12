@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -170,8 +169,8 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		// Only return quota if downstream failed and quota was actually pre-consumed
 		if newAPIError != nil {
 			newAPIError = service.NormalizeViolationFeeError(newAPIError)
-			if relayInfo.FinalPreConsumedQuota != 0 {
-				service.ReturnPreConsumedQuota(c, relayInfo)
+			if relayInfo.Billing != nil {
+				relayInfo.Billing.Refund(c)
 			}
 			service.ChargeViolationFeeIfNeeded(c, relayInfo, newAPIError)
 		}
@@ -193,7 +192,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 
 		addUsedChannel(c, channel.Id)
-		requestBody, bodyErr := common.GetRequestBody(c)
+		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
 			// Ensure consistent 413 for oversized bodies even when error occurs later (e.g., retry path)
 			if common.IsRequestBodyTooLargeError(bodyErr) || errors.Is(bodyErr, common.ErrRequestBodyTooLarge) {
@@ -203,7 +202,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			}
 			break
 		}
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+		c.Request.Body = io.NopCloser(bodyStorage)
 
 		switch relayFormat {
 		case types.RelayFormatOpenAIRealtime:
@@ -483,7 +482,7 @@ func RelayTask(c *gin.Context) {
 		logger.LogInfo(c, fmt.Sprintf("using channel #%d to retry (remain times %d)", channel.Id, retryParam.GetRetry()))
 		//middleware.SetupContextForSelectedChannel(c, channel, originalModel)
 
-		requestBody, err := common.GetRequestBody(c)
+		bodyStorage, err := common.GetBodyStorage(c)
 		if err != nil {
 			if common.IsRequestBodyTooLargeError(err) || errors.Is(err, common.ErrRequestBodyTooLarge) {
 				taskErr = service.TaskErrorWrapperLocal(err, "read_request_body_failed", http.StatusRequestEntityTooLarge)
@@ -492,7 +491,7 @@ func RelayTask(c *gin.Context) {
 			}
 			break
 		}
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+		c.Request.Body = io.NopCloser(bodyStorage)
 		taskErr = taskRelayHandler(c, relayInfo)
 	}
 	useChannel := c.GetStringSlice("use_channel")

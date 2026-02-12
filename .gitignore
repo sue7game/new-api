@@ -29,13 +29,12 @@ new-api-linux
 daemon.json
 
 data/
-<<<<<<< HEAD
 
 new-api_2025-12-12_09-56-28_mysql_data.sql
 new-api-linux_backup1206
-=======
+
 .gomodcache/
 .gocache-temp
 .gopath
->>>>>>> upstream/main
+
 helloagents

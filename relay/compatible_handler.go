@@ -23,7 +23,6 @@ import (
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/shopspring/decimal"
-	"github.com/tidwall/sjson"
 
 	"github.com/gin-gonic/gin"
 )
@@ -77,32 +76,10 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	adaptor.Init(info)
 
 	passThroughGlobal := model_setting.GetGlobalSettings().PassThroughRequestEnabled
-	passThroughContent := info.ChannelSetting.PassThroughContentEnabled
 	if info.RelayMode == relayconstant.RelayModeChatCompletions &&
 		!passThroughGlobal &&
 		!info.ChannelSetting.PassThroughBodyEnabled &&
-
-		!passThroughContent &&
 		service.ShouldChatCompletionsUseResponsesGlobal(info.ChannelId, info.ChannelType, info.OriginModelName) {
-
-		// Inject default reasoning effort only in ChatCompletions→Responses compatibility mode.
-		// When the client explicitly sets reasoning_effort to a non-none value, keep it.
-		// When the client omits reasoning_effort or sets it to "none", allow policy-based override.
-		if request.ReasoningEffort == "" || request.ReasoningEffort == "none" {
-
-			//fmt.Printf("11111当前ReasoningEffort参数值为：%s\n", request.ReasoningEffort)
-			policy := model_setting.GetGlobalSettings().ChatCompletionsToResponsesPolicy
-			if effort := policy.GetDefaultReasoningEffort(info.OriginModelName); effort != "" {
-				request.ReasoningEffort = effort
-			} else if effort := policy.GetDefaultReasoningEffort(request.Model); effort != "" {
-				// best-effort fallback for model-mapped scenarios
-				request.ReasoningEffort = effort
-			}
-		} else {
-
-			//fmt.Printf("2222当前ReasoningEffort参数值为：%s\n", request.ReasoningEffort)
-		}
-		//fmt.Printf("3333333当前ReasoningEffort参数值为：%s\n", request.ReasoningEffort)
 		applySystemPromptIfNeeded(c, info, request)
 		usage, newApiErr := chatCompletionsViaResponses(c, info, adaptor, request)
 		if newApiErr != nil {
@@ -123,50 +100,17 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	var requestBody io.Reader
 
 	if passThroughGlobal || info.ChannelSetting.PassThroughBodyEnabled {
-
-		//fmt.Println("[TextHelper] 进入分支：passThroughGlobal/PassThroughBodyEnabled")
-		body, err := common.GetRequestBody(c)
+		storage, err := common.GetBodyStorage(c)
 		if err != nil {
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		}
 		if common.DebugEnabled {
-			println("requestBody: ", string(body))
-		}
-		requestBody = bytes.NewBuffer(body)
-	} else if passThroughContent {
-
-		//fmt.Println("[TextHelper] 进入分支：passThroughContent22222222222")
-		body, err := common.GetRequestBody(c)
-		if err != nil {
-			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
-		}
-
-		// 仅改写必要字段：模型重定向 / 字段透传控制 / 参数覆写
-		if info.UpstreamModelName != "" {
-			body, err = sjson.SetBytes(body, "model", info.UpstreamModelName)
-			if err != nil {
-				return types.NewErrorWithStatusCode(err, types.ErrorCodeBadRequestBody, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+			if debugBytes, bErr := storage.Bytes(); bErr == nil {
+				println("requestBody: ", string(debugBytes))
 			}
 		}
-
-		// remove disabled fields for OpenAI API
-		body, err = relaycommon.RemoveDisabledFields(body, info.ChannelOtherSettings)
-		if err != nil {
-			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
-		}
-
-		// apply param override
-		if len(info.ParamOverride) > 0 {
-			body, err = relaycommon.ApplyParamOverride(body, info.ParamOverride, relaycommon.BuildParamOverrideContext(info))
-			if err != nil {
-				return types.NewError(err, types.ErrorCodeChannelParamOverrideInvalid, types.ErrOptionWithSkipRetry())
-			}
-		}
-
-		logger.LogDebug(c, fmt.Sprintf("text request pass-through content body: %s", string(body)))
-		requestBody = bytes.NewBuffer(body)
+		requestBody = common.ReaderOnly(storage)
 	} else {
-		//fmt.Println("[TextHelper] 2343555555555555555555555")
 		convertedRequest, err := adaptor.ConvertOpenAIRequest(c, info, request)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
@@ -392,7 +336,7 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 
 	var audioInputQuota decimal.Decimal
 	var audioInputPrice float64
-	isClaudeUsageSemantic := relayInfo.ChannelType == constant.ChannelTypeAnthropic
+	isClaudeUsageSemantic := relayInfo.FinalRequestRelayFormat == types.RelayFormatClaude
 	if !relayInfo.PriceData.UsePrice {
 		baseTokens := dPromptTokens
 		// 减去 cached tokens
@@ -481,29 +425,8 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 
-	quotaDelta := quota - relayInfo.FinalPreConsumedQuota
-
-	//logger.LogInfo(ctx, fmt.Sprintf("request quota delta: %s", logger.FormatQuota(quotaDelta)))
-
-	if quotaDelta > 0 {
-		logger.LogInfo(ctx, fmt.Sprintf("预扣费后补扣费：%s（实际消耗：%s，预扣费：%s）",
-			logger.FormatQuota(quotaDelta),
-			logger.FormatQuota(quota),
-			logger.FormatQuota(relayInfo.FinalPreConsumedQuota),
-		))
-	} else if quotaDelta < 0 {
-		logger.LogInfo(ctx, fmt.Sprintf("预扣费后返还扣费：%s（实际消耗：%s，预扣费：%s）",
-			logger.FormatQuota(-quotaDelta),
-			logger.FormatQuota(quota),
-			logger.FormatQuota(relayInfo.FinalPreConsumedQuota),
-		))
-	}
-
-	if quotaDelta != 0 {
-		err := service.PostConsumeQuota(relayInfo, quotaDelta, relayInfo.FinalPreConsumedQuota, true)
-		if err != nil {
-			logger.LogError(ctx, "error consuming token remain quota: "+err.Error())
-		}
+	if err := service.SettleBilling(ctx, relayInfo, quota); err != nil {
+		logger.LogError(ctx, "error settling billing: "+err.Error())
 	}
 
 	logModel := modelName
