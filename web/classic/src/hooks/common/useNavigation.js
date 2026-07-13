@@ -25,20 +25,28 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
     const defaultModules = {
       home: true,
       console: true,
-      pricing: true,
+      pricing: {
+        enabled: true,
+        requireAuth: false,
+      },
       docs: true,
       about: true,
+      pay: true,
     };
 
-    // 使用传入的配置或默认配置
-    const modules = headerNavModules || defaultModules;
+    const modules = {
+      ...defaultModules,
+      ...(headerNavModules || {}),
+      pricing:
+        typeof headerNavModules?.pricing === 'object'
+          ? {
+              ...defaultModules.pricing,
+              ...headerNavModules.pricing,
+            }
+          : (headerNavModules?.pricing ?? defaultModules.pricing),
+    };
 
     const allLinks = [
-      {
-        text: t('首页'),
-        itemKey: 'home',
-        to: '/',
-      },
       {
         text: t('控制台'),
         itemKey: 'console',
@@ -48,6 +56,11 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         text: t('模型广场'),
         itemKey: 'pricing',
         to: '/pricing',
+      },
+      {
+        text: t('关于'),
+        itemKey: 'about',
+        to: '/about',
       },
       ...(docsLink
         ? [
@@ -60,9 +73,18 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
           ]
         : []),
       {
-        text: t('关于'),
-        itemKey: 'about',
-        to: '/about',
+        text: t('商城'),
+        itemKey: 'pay',
+        isExternal: true,
+        externalLink: 'https://mall.aiday.top',
+        target: '_blank',
+      },
+      {
+        text: t('香蕉生图'),
+        itemKey: 'home',
+        isExternal: true,
+        externalLink: 'https://image.aiday.top',
+        target: '_blank',
       },
     ];
 

@@ -476,7 +476,13 @@ func GetSelf(c *gin.Context) {
 	permissions["admin_permissions"] = authz.Capabilities(id, userRole)
 
 	// 获取用户设置并提取sidebar_modules
-	userSetting := user.GetSetting()
+	userSetting := model.ApplyUserSettingRolePolicy(user.GetSetting(), user.Role)
+	settingJSON := user.Setting
+	if settingBytes, marshalErr := common.Marshal(userSetting); marshalErr == nil {
+		settingJSON = string(settingBytes)
+	} else {
+		common.SysLog("failed to marshal user setting: " + marshalErr.Error())
+	}
 
 	// 构建响应数据，包含用户信息和权限
 	responseData := map[string]interface{}{
@@ -501,7 +507,7 @@ func GetSelf(c *gin.Context) {
 		"aff_history_quota": user.AffHistoryQuota,
 		"inviter_id":        user.InviterId,
 		"linux_do_id":       user.LinuxDOId,
-		"setting":           user.Setting,
+		"setting":           settingJSON,
 		"stripe_customer":   user.StripeCustomer,
 		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
 		"permissions":       permissions,                // 新增权限字段

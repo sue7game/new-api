@@ -188,8 +188,8 @@ const FooterBar = () => {
           </div>
         )}
 
-        <div className='flex flex-col md:flex-row items-center justify-between w-full max-w-[1110px] gap-6'>
-          <div className='flex flex-wrap items-center gap-2'>
+        <div className='flex flex-col items-center justify-center w-full max-w-[1110px] gap-2 py-4'>
+          <div className='flex flex-wrap items-center gap-2 justify-center'>
             <Typography.Text className='text-sm !text-semi-color-text-1'>
               © {currentYear} {systemName}. {t('版权所有')}
             </Typography.Text>
@@ -208,6 +208,12 @@ const FooterBar = () => {
               New API
             </a>
           </div>
+
+          <Typography.Text className='text-xs !text-semi-color-text-2 mt-1 text-center'>
+            {t(
+              '本站API适用于测试和体验目的，请自觉遵守您当地法律法规，切勿用于非法用途，本站不承担任何法律责任。',
+            )}
+          </Typography.Text>
         </div>
       </footer>
     ),

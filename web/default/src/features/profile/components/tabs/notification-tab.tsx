@@ -67,6 +67,8 @@ interface NotificationTabProps {
 export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
   const { t } = useTranslation()
   const isAdmin = (profile?.role ?? 0) >= ROLE.ADMIN
+  const isRoot = (profile?.role ?? 0) === ROLE.SUPER_ADMIN
+  const isRecordIpLogForced = !isRoot
   const [loading, setLoading] = useState(false)
   const [settings, setSettings] = useState<UserSettings>({
     notify_type: 'email',
@@ -79,7 +81,7 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
     gotify_token: '',
     gotify_priority: 5,
     accept_unset_model_ratio_model: false,
-    record_ip_log: false,
+    record_ip_log: true,
     upstream_model_update_notify_enabled: false,
   })
 
@@ -92,32 +94,35 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
   )
 
   useEffect(() => {
-    if (profile?.setting) {
-      const parsed = parseUserSettings(profile.setting)
-      setSettings({
-        notify_type: normalizeNotifyType(parsed.notify_type),
-        quota_warning_threshold:
-          parsed.quota_warning_threshold ?? DEFAULT_QUOTA_WARNING_THRESHOLD,
-        notification_email: parsed.notification_email ?? '',
-        webhook_url: parsed.webhook_url ?? '',
-        webhook_secret: parsed.webhook_secret ?? '',
-        bark_url: parsed.bark_url ?? '',
-        gotify_url: parsed.gotify_url ?? '',
-        gotify_token: parsed.gotify_token ?? '',
-        gotify_priority: parsed.gotify_priority ?? 5,
-        accept_unset_model_ratio_model:
-          parsed.accept_unset_model_ratio_model || false,
-        record_ip_log: parsed.record_ip_log || false,
-        upstream_model_update_notify_enabled:
-          parsed.upstream_model_update_notify_enabled || false,
-      })
-    }
-  }, [profile])
+    if (!profile) return
+
+    const parsed = parseUserSettings(profile.setting)
+    setSettings({
+      notify_type: normalizeNotifyType(parsed.notify_type),
+      quota_warning_threshold:
+        parsed.quota_warning_threshold ?? DEFAULT_QUOTA_WARNING_THRESHOLD,
+      notification_email: parsed.notification_email ?? '',
+      webhook_url: parsed.webhook_url ?? '',
+      webhook_secret: parsed.webhook_secret ?? '',
+      bark_url: parsed.bark_url ?? '',
+      gotify_url: parsed.gotify_url ?? '',
+      gotify_token: parsed.gotify_token ?? '',
+      gotify_priority: parsed.gotify_priority ?? 5,
+      accept_unset_model_ratio_model:
+        parsed.accept_unset_model_ratio_model || false,
+      record_ip_log: isRecordIpLogForced ? true : parsed.record_ip_log || false,
+      upstream_model_update_notify_enabled:
+        parsed.upstream_model_update_notify_enabled || false,
+    })
+  }, [profile, isRecordIpLogForced])
 
   const handleSave = async () => {
     try {
       setLoading(true)
-      const response = await updateUserSettings(settings)
+      const payload = isRecordIpLogForced
+        ? { ...settings, record_ip_log: true }
+        : settings
+      const response = await updateUserSettings(payload)
 
       if (response.success) {
         toast.success(t('Settings updated successfully'))
@@ -125,7 +130,7 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
       } else {
         toast.error(response.message || t('Failed to update settings'))
       }
-    } catch (_error) {
+    } catch {
       toast.error(t('Failed to update settings'))
     } finally {
       setLoading(false)
@@ -143,8 +148,9 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
           value={[notifyType]}
           onValueChange={(value) => {
             const nextValue = value.find((item) => item !== notifyType)
-            if (nextValue)
+            if (nextValue) {
               updateField('notify_type', normalizeNotifyType(nextValue))
+            }
           }}
           aria-label={t('Notification Method')}
           variant='outline'
@@ -388,7 +394,10 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
             id='recordIp'
             className='shrink-0'
             checked={settings.record_ip_log}
-            onCheckedChange={(checked) => updateField('record_ip_log', checked)}
+            disabled={isRecordIpLogForced}
+            onCheckedChange={(checked) => {
+              if (!isRecordIpLogForced) updateField('record_ip_log', checked)
+            }}
           />
         </div>
       </div>

@@ -94,8 +94,10 @@ const PersonalSetting = () => {
     gotifyPriority: 5,
     upstreamModelUpdateNotifyEnabled: false,
     acceptUnsetModelRatioModel: false,
-    recordIpLog: false,
+    recordIpLog: true,
   });
+  const isRootUser = (userState?.user?.role || 0) === 100;
+  const isRecordIpLogForced = !isRootUser;
 
   const {
     isModalVisible: isPasskeyVerificationModalVisible,
@@ -180,27 +182,29 @@ const PersonalSetting = () => {
   }, [disableButton, countdown]);
 
   useEffect(() => {
-    if (userState?.user?.setting) {
-      const settings = JSON.parse(userState.user.setting);
-      setNotificationSettings({
-        warningType: settings.notify_type || 'email',
-        warningThreshold: settings.quota_warning_threshold || 500000,
-        webhookUrl: settings.webhook_url || '',
-        webhookSecret: settings.webhook_secret || '',
-        notificationEmail: settings.notification_email || '',
-        barkUrl: settings.bark_url || '',
-        gotifyUrl: settings.gotify_url || '',
-        gotifyToken: settings.gotify_token || '',
-        gotifyPriority:
-          settings.gotify_priority !== undefined ? settings.gotify_priority : 5,
-        upstreamModelUpdateNotifyEnabled:
-          settings.upstream_model_update_notify_enabled === true,
-        acceptUnsetModelRatioModel:
-          settings.accept_unset_model_ratio_model || false,
-        recordIpLog: settings.record_ip_log || false,
-      });
-    }
-  }, [userState?.user?.setting]);
+    if (!userState?.user) return;
+
+    const settings = userState.user.setting
+      ? JSON.parse(userState.user.setting)
+      : {};
+    setNotificationSettings({
+      warningType: settings.notify_type || 'email',
+      warningThreshold: settings.quota_warning_threshold || 500000,
+      webhookUrl: settings.webhook_url || '',
+      webhookSecret: settings.webhook_secret || '',
+      notificationEmail: settings.notification_email || '',
+      barkUrl: settings.bark_url || '',
+      gotifyUrl: settings.gotify_url || '',
+      gotifyToken: settings.gotify_token || '',
+      gotifyPriority:
+        settings.gotify_priority !== undefined ? settings.gotify_priority : 5,
+      upstreamModelUpdateNotifyEnabled:
+        settings.upstream_model_update_notify_enabled === true,
+      acceptUnsetModelRatioModel:
+        settings.accept_unset_model_ratio_model || false,
+      recordIpLog: isRecordIpLogForced ? true : settings.record_ip_log || false,
+    });
+  }, [userState?.user, isRecordIpLogForced]);
 
   const handleInputChange = (name, value) => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
@@ -527,7 +531,9 @@ const PersonalSetting = () => {
           notificationSettings.upstreamModelUpdateNotifyEnabled === true,
         accept_unset_model_ratio_model:
           notificationSettings.acceptUnsetModelRatioModel,
-        record_ip_log: notificationSettings.recordIpLog,
+        record_ip_log: isRecordIpLogForced
+          ? true
+          : notificationSettings.recordIpLog,
       });
 
       if (res.data.success) {
@@ -593,6 +599,7 @@ const PersonalSetting = () => {
               notificationSettings={notificationSettings}
               handleNotificationSettingChange={handleNotificationSettingChange}
               saveNotificationSettings={saveNotificationSettings}
+              isRecordIpLogForced={isRecordIpLogForced}
             />
           </div>
         </div>

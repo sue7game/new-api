@@ -144,10 +144,7 @@ function renderType(type, t) {
 
 function buildStreamStatusTooltip(ss, t) {
   if (!ss) return null;
-  const lines = [
-    t('流状态') + '：' + t('异常'),
-    (ss.end_reason || 'unknown'),
-  ];
+  const lines = [t('流状态') + '：' + t('异常'), ss.end_reason || 'unknown'];
   if (ss.error_count > 0) {
     lines.push(`${t('软错误')}: ${ss.error_count}`);
   }
@@ -185,11 +182,7 @@ function renderIsStream(bool, t, streamStatus) {
                 userSelect: 'none',
               }}
             >
-              <CircleAlert
-                size={14}
-                strokeWidth={2.5}
-                color='currentColor'
-              />
+              <CircleAlert size={14} strokeWidth={2.5} color='currentColor' />
             </span>
           </Tooltip>
         )}
@@ -267,6 +260,25 @@ function renderBillingTag(record, t) {
     );
   }
   return null;
+}
+
+function renderAdminTokenQuota(record, t) {
+  if (!record?.token_id) {
+    return null;
+  }
+
+  if (record.display_unlimited_quota === true) {
+    return t('无限额度');
+  }
+
+  if (
+    record.display_remain_quota !== undefined &&
+    record.display_remain_quota !== null
+  ) {
+    return `${t('剩余额度')} ${renderQuota(record.display_remain_quota)}`;
+  }
+
+  return t('已删除');
 }
 
 function renderModelName(record, copyText, t) {
@@ -461,7 +473,11 @@ function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
     };
   }
 
-  const summaryOpts = { ...other, displayMode: billingDisplayMode, outputMode: 'segments' };
+  const summaryOpts = {
+    ...other,
+    displayMode: billingDisplayMode,
+    outputMode: 'segments',
+  };
 
   if (other?.billing_mode === 'tiered_expr') {
     return { segments: renderTieredModelPriceSimple(summaryOpts) };
@@ -613,6 +629,9 @@ export const getLogsColumns = ({
       title: t('令牌'),
       dataIndex: 'token_name',
       render: (text, record, index) => {
+        const adminTokenQuota = isAdminUser
+          ? renderAdminTokenQuota(record, t)
+          : null;
         return record.type === 0 ||
           record.type === 2 ||
           record.type === 5 ||
@@ -628,6 +647,11 @@ export const getLogsColumns = ({
               {' '}
               {t(text)}{' '}
             </Tag>
+            {adminTokenQuota ? (
+              <Typography.Text className='mt-1 block !text-xs !text-semi-color-text-2'>
+                {adminTokenQuota}
+              </Typography.Text>
+            ) : null}
           </div>
         ) : (
           <></>

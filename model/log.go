@@ -57,27 +57,32 @@ func sanitizeClickHouseLikePattern(input string) (string, error) {
 }
 
 type Log struct {
-	Id                int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2"`
-	UserId            int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1"`
-	CreatedAt         int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_created_at_type"`
-	Type              int    `json:"type" gorm:"index:idx_created_at_type"`
-	Content           string `json:"content"`
-	Username          string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
-	TokenName         string `json:"token_name" gorm:"index;default:''"`
-	ModelName         string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
-	Quota             int    `json:"quota" gorm:"default:0"`
-	PromptTokens      int    `json:"prompt_tokens" gorm:"default:0"`
-	CompletionTokens  int    `json:"completion_tokens" gorm:"default:0"`
-	UseTime           int    `json:"use_time" gorm:"default:0"`
-	IsStream          bool   `json:"is_stream"`
-	ChannelId         int    `json:"channel" gorm:"index"`
-	ChannelName       string `json:"channel_name" gorm:"->"`
-	TokenId           int    `json:"token_id" gorm:"default:0;index"`
-	Group             string `json:"group" gorm:"index"`
-	Ip                string `json:"ip" gorm:"index;default:''"`
-	RequestId         string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
-	UpstreamRequestId string `json:"upstream_request_id,omitempty" gorm:"type:varchar(128);index:idx_logs_upstream_request_id;default:''"`
-	Other             string `json:"other"`
+	Id                  int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2"`
+	UserId              int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1"`
+	CreatedAt           int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_created_at_type"`
+	Type                int    `json:"type" gorm:"index:idx_created_at_type"`
+	Content             string `json:"content"`
+	Username            string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
+	TokenName           string `json:"token_name" gorm:"index;default:''"`
+	ModelName           string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
+	Quota               int    `json:"quota" gorm:"default:0"`
+	PromptTokens        int    `json:"prompt_tokens" gorm:"default:0"`
+	CompletionTokens    int    `json:"completion_tokens" gorm:"default:0"`
+	UseTime             int    `json:"use_time" gorm:"default:0"`
+	IsStream            bool   `json:"is_stream"`
+	ChannelId           int    `json:"channel" gorm:"index"`
+	ChannelName         string `json:"channel_name" gorm:"->"`
+	TokenId             int    `json:"token_id" gorm:"default:0;index"`
+	TokenRemainQuota    *int   `json:"token_remain_quota,omitempty" gorm:"-"`
+	TokenUsedQuota      *int   `json:"token_used_quota,omitempty" gorm:"-"`
+	TokenUnlimitedQuota *bool  `json:"token_unlimited_quota,omitempty" gorm:"-"`
+	DisplayRemainQuota  *int   `json:"display_remain_quota,omitempty" gorm:"-"`
+	DisplayUnlimited    *bool  `json:"display_unlimited_quota,omitempty" gorm:"-"`
+	Group               string `json:"group" gorm:"index"`
+	Ip                  string `json:"ip" gorm:"index;default:''"`
+	RequestId           string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
+	UpstreamRequestId   string `json:"upstream_request_id,omitempty" gorm:"type:varchar(128);index:idx_logs_upstream_request_id;default:''"`
+	Other               string `json:"other"`
 }
 
 // don't use iota, avoid change log type value
@@ -119,8 +124,11 @@ func formatUserLogs(logs []*Log, startIdx int) {
 		var otherMap map[string]interface{}
 		otherMap, _ = common.StrToMap(logs[i].Other)
 		if otherMap != nil {
-			// Remove admin-only debug fields.
+			// Remove fields reserved for administrators.
 			delete(otherMap, "admin_info")
+			delete(otherMap, "reject_reason")
+			delete(otherMap, "is_model_mapped")
+			delete(otherMap, "upstream_model_name")
 			// Remove operation-audit details (operator/route info), admin-only.
 			delete(otherMap, "audit_info")
 			// delete(otherMap, "reject_reason")
@@ -286,13 +294,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	otherStr := common.MapToJsonStr(other)
-	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
-	}
+	needRecordIp := shouldRecordIpLog(userId)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
@@ -325,6 +327,20 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	}
 }
 
+func shouldRecordIpLog(userId int) bool {
+	if userId <= 0 {
+		return false
+	}
+	if settingMap, err := GetUserSetting(userId, false); err == nil && settingMap.RecordIpLog {
+		return true
+	}
+	role, err := GetUserRole(userId)
+	if err != nil {
+		return false
+	}
+	return role != common.RoleRootUser
+}
+
 type RecordConsumeLogParams struct {
 	ChannelId        int                    `json:"channel_id"`
 	PromptTokens     int                    `json:"prompt_tokens"`
@@ -350,13 +366,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
 	otherStr := common.MapToJsonStr(params.Other)
-	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
-	}
+	needRecordIp := shouldRecordIpLog(userId)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
@@ -465,6 +475,108 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	}
 }
 
+type tokenQuotaSnapshot struct {
+	Id             int  `gorm:"column:id"`
+	UserId         int  `gorm:"column:user_id"`
+	RemainQuota    int  `gorm:"column:remain_quota"`
+	UsedQuota      int  `gorm:"column:used_quota"`
+	UnlimitedQuota bool `gorm:"column:unlimited_quota"`
+}
+
+type userQuotaSnapshot struct {
+	Id    int `gorm:"column:id"`
+	Role  int `gorm:"column:role"`
+	Quota int `gorm:"column:quota"`
+}
+
+func loadTokenQuotaSnapshots(tokenIds []int) (map[int]tokenQuotaSnapshot, []int, error) {
+	var tokens []tokenQuotaSnapshot
+	if err := DB.Model(&Token{}).
+		Select("id, user_id, remain_quota, used_quota, unlimited_quota").
+		Where("id IN ?", tokenIds).
+		Find(&tokens).Error; err != nil {
+		return nil, nil, err
+	}
+
+	userIds := types.NewSet[int]()
+	tokenMap := make(map[int]tokenQuotaSnapshot, len(tokens))
+	for _, token := range tokens {
+		tokenMap[token.Id] = token
+		if token.UserId > 0 {
+			userIds.Add(token.UserId)
+		}
+	}
+	return tokenMap, userIds.Items(), nil
+}
+
+func loadUserQuotaSnapshots(userIds []int) (map[int]userQuotaSnapshot, error) {
+	userMap := make(map[int]userQuotaSnapshot, len(userIds))
+	if len(userIds) == 0 {
+		return userMap, nil
+	}
+
+	var users []userQuotaSnapshot
+	if err := DB.Model(&User{}).
+		Select("id, role, quota").
+		Where("id IN ?", userIds).
+		Find(&users).Error; err != nil {
+		return nil, err
+	}
+	for _, user := range users {
+		userMap[user.Id] = user
+	}
+	return userMap, nil
+}
+
+func applyCurrentTokenQuota(logs []*Log, tokenMap map[int]tokenQuotaSnapshot, userMap map[int]userQuotaSnapshot) {
+	for _, log := range logs {
+		token, ok := tokenMap[log.TokenId]
+		if !ok {
+			continue
+		}
+		remainQuota := token.RemainQuota
+		usedQuota := token.UsedQuota
+		unlimitedQuota := token.UnlimitedQuota
+		log.TokenRemainQuota = &remainQuota
+		log.TokenUsedQuota = &usedQuota
+		log.TokenUnlimitedQuota = &unlimitedQuota
+
+		user, ok := userMap[token.UserId]
+		if ok && user.Role < common.RoleAdminUser {
+			displayRemainQuota := user.Quota
+			displayUnlimited := false
+			log.DisplayRemainQuota = &displayRemainQuota
+			log.DisplayUnlimited = &displayUnlimited
+			continue
+		}
+		log.DisplayRemainQuota = &remainQuota
+		log.DisplayUnlimited = &unlimitedQuota
+	}
+}
+
+func hydrateCurrentTokenQuota(logs []*Log) error {
+	tokenIds := types.NewSet[int]()
+	for _, log := range logs {
+		if log.TokenId > 0 {
+			tokenIds.Add(log.TokenId)
+		}
+	}
+	if tokenIds.Len() == 0 {
+		return nil
+	}
+
+	tokenMap, userIds, err := loadTokenQuotaSnapshots(tokenIds.Items())
+	if err != nil {
+		return err
+	}
+	userMap, err := loadUserQuotaSnapshots(userIds)
+	if err != nil {
+		return err
+	}
+	applyCurrentTokenQuota(logs, tokenMap, userMap)
+	return nil
+}
+
 func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
@@ -554,6 +666,10 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 		for i := range logs {
 			logs[i].ChannelName = channelMap[logs[i].ChannelId]
 		}
+	}
+
+	if err = hydrateCurrentTokenQuota(logs); err != nil {
+		return logs, total, err
 	}
 
 	return logs, total, err

@@ -68,6 +68,14 @@ func (user *User) ToBaseUser() *UserBase {
 	return cache
 }
 
+// ApplyUserSettingRolePolicy applies role-based constraints to user settings.
+func ApplyUserSettingRolePolicy(setting dto.UserSetting, role int) dto.UserSetting {
+	if role != common.RoleRootUser {
+		setting.RecordIpLog = true
+	}
+	return setting
+}
+
 func (user *User) GetAccessToken() string {
 	if user.AccessToken == nil {
 		return ""
@@ -91,6 +99,7 @@ func (user *User) GetSetting() dto.UserSetting {
 }
 
 func (user *User) SetSetting(setting dto.UserSetting) {
+	setting = ApplyUserSettingRolePolicy(setting, user.Role)
 	settingBytes, err := common.Marshal(setting)
 	if err != nil {
 		common.SysLog("failed to marshal setting: " + err.Error())
@@ -103,6 +112,11 @@ func UpdateUserSetting(userId int, setting dto.UserSetting) error {
 	if userId == 0 {
 		return errors.New("id 为空！")
 	}
+	role, err := GetUserRole(userId)
+	if err != nil {
+		return err
+	}
+	setting = ApplyUserSettingRolePolicy(setting, role)
 	settingBytes, err := common.Marshal(setting)
 	if err != nil {
 		return err
@@ -1010,6 +1024,12 @@ func GetUserGroup(id int, fromDB bool) (group string, err error) {
 	}
 
 	return group, nil
+}
+
+// GetUserRole returns the user's role from the primary database.
+func GetUserRole(id int) (role int, err error) {
+	err = DB.Model(&User{}).Where("id = ?", id).Select("role").Find(&role).Error
+	return role, err
 }
 
 // GetUserSetting gets setting from Redis first, falls back to DB if needed

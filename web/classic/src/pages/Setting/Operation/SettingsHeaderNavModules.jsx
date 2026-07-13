@@ -33,22 +33,50 @@ import { StatusContext } from '../../../context/Status';
 
 const { Text } = Typography;
 
+function createDefaultHeaderNavModules() {
+  return {
+    home: true,
+    console: true,
+    pricing: {
+      enabled: true,
+      requireAuth: false,
+    },
+    docs: true,
+    about: true,
+    pay: true,
+  };
+}
+
+function normalizeHeaderNavModules(modules) {
+  const defaults = createDefaultHeaderNavModules();
+  const normalized = {
+    ...defaults,
+    ...(modules || {}),
+  };
+
+  normalized.pricing =
+    typeof normalized.pricing === 'boolean'
+      ? {
+          enabled: normalized.pricing,
+          requireAuth: false,
+        }
+      : {
+          ...defaults.pricing,
+          ...(normalized.pricing || {}),
+        };
+
+  return normalized;
+}
+
 export default function SettingsHeaderNavModules(props) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [statusState, statusDispatch] = useContext(StatusContext);
 
   // 顶栏模块管理状态
-  const [headerNavModules, setHeaderNavModules] = useState({
-    home: true,
-    console: true,
-    pricing: {
-      enabled: true,
-      requireAuth: false, // 默认不需要登录鉴权
-    },
-    docs: true,
-    about: true,
-  });
+  const [headerNavModules, setHeaderNavModules] = useState(
+    createDefaultHeaderNavModules,
+  );
 
   // 处理顶栏模块配置变更
   function handleHeaderNavModuleChange(moduleKey) {
@@ -79,17 +107,7 @@ export default function SettingsHeaderNavModules(props) {
 
   // 重置顶栏模块为默认配置
   function resetHeaderNavModules() {
-    const defaultModules = {
-      home: true,
-      console: true,
-      pricing: {
-        enabled: true,
-        requireAuth: false,
-      },
-      docs: true,
-      about: true,
-    };
-    setHeaderNavModules(defaultModules);
+    setHeaderNavModules(createDefaultHeaderNavModules());
     showSuccess(t('已重置为默认配置'));
   }
 
@@ -133,29 +151,9 @@ export default function SettingsHeaderNavModules(props) {
     if (props.options && props.options.HeaderNavModules) {
       try {
         const modules = JSON.parse(props.options.HeaderNavModules);
-
-        // 处理向后兼容性：如果pricing是boolean，转换为对象格式
-        if (typeof modules.pricing === 'boolean') {
-          modules.pricing = {
-            enabled: modules.pricing,
-            requireAuth: false, // 默认不需要登录鉴权
-          };
-        }
-
-        setHeaderNavModules(modules);
+        setHeaderNavModules(normalizeHeaderNavModules(modules));
       } catch (error) {
-        // 使用默认配置
-        const defaultModules = {
-          home: true,
-          console: true,
-          pricing: {
-            enabled: true,
-            requireAuth: false,
-          },
-          docs: true,
-          about: true,
-        };
-        setHeaderNavModules(defaultModules);
+        setHeaderNavModules(createDefaultHeaderNavModules());
       }
     }
   }, [props.options]);
@@ -187,6 +185,11 @@ export default function SettingsHeaderNavModules(props) {
       key: 'about',
       title: t('关于'),
       description: t('关于系统的详细信息'),
+    },
+    {
+      key: 'pay',
+      title: t('商城'),
+      description: t('管理员设置的外部商城链接'),
     },
   ];
 

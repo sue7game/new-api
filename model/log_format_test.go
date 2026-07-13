@@ -33,3 +33,22 @@ func TestFormatUserLogsStripsQuotaSaturation(t *testing.T) {
 	// Non-admin billing fields remain visible.
 	require.Contains(t, parsed, "model_price")
 }
+
+func TestFormatUserLogsStripsPrivateRelayMetadata(t *testing.T) {
+	other := common.MapToJsonStr(map[string]interface{}{
+		"model_price":         0.004,
+		"reject_reason":       "provider policy",
+		"is_model_mapped":     true,
+		"upstream_model_name": "provider-model",
+	})
+	logs := []*Log{{Other: other}}
+
+	formatUserLogs(logs, 0)
+
+	parsed, err := common.StrToMap(logs[0].Other)
+	require.NoError(t, err)
+	require.Contains(t, parsed, "model_price")
+	require.NotContains(t, parsed, "reject_reason")
+	require.NotContains(t, parsed, "is_model_mapped")
+	require.NotContains(t, parsed, "upstream_model_name")
+}

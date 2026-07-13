@@ -54,6 +54,7 @@ const NotificationSettings = ({
   notificationSettings,
   handleNotificationSettingChange,
   saveNotificationSettings,
+  isRecordIpLogForced,
 }) => {
   const formApiRef = useRef(null);
   const [statusState] = useContext(StatusContext);
@@ -478,7 +479,10 @@ const NotificationSettings = ({
                     checkedText={t('开')}
                     uncheckedText={t('关')}
                     onChange={(value) =>
-                      handleFormChange('upstreamModelUpdateNotifyEnabled', value)
+                      handleFormChange(
+                        'upstreamModelUpdateNotifyEnabled',
+                        value,
+                      )
                     }
                     extraText={t(
                       '仅管理员可用。开启后，当系统定时检测全部渠道发现上游模型变更或检测异常时，将按你选择的通知方式发送汇总通知；渠道或模型过多时会自动省略部分明细。',
@@ -789,7 +793,12 @@ const NotificationSettings = ({
                   label={t('记录请求与错误日志IP')}
                   checkedText={t('开')}
                   uncheckedText={t('关')}
-                  onChange={(value) => handleFormChange('recordIpLog', value)}
+                  disabled={isRecordIpLogForced}
+                  onChange={(value) => {
+                    if (!isRecordIpLogForced) {
+                      handleFormChange('recordIpLog', value);
+                    }
+                  }}
                   extraText={t(
                     '开启后，仅"消费"和"错误"日志将记录您的客户端IP地址',
                   )}
