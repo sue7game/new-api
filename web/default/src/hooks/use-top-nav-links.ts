@@ -40,7 +40,9 @@ export type TopNavLink = {
  *   pricing: { enabled: true, requireAuth: false },
  *   rankings: { enabled: true, requireAuth: false },
  *   docs: true,
- *   about: true
+ *   about: true,
+ *   pay: true,
+ *   banana: true
  * }
  */
 export function useTopNavLinks(): TopNavLink[] {
@@ -62,11 +64,6 @@ export function useTopNavLinks(): TopNavLink[] {
 
   const links: TopNavLink[] = []
 
-  // Home
-  if (modules?.home !== false) {
-    links.push({ title: t('Home'), href: '/' })
-  }
-
   // Console -> /dashboard (new console path)
   if (modules?.console !== false) {
     links.push({ title: t('Console'), href: '/dashboard' })
@@ -86,22 +83,38 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Rankings'), href: '/rankings', requiresAuth })
   }
 
+  // About
+  if (modules?.about !== false) {
+    links.push({ title: t('About'), href: '/about' })
+  }
+
   // Docs (supports external links)
   if (modules?.docs !== false) {
     if (docsLink) {
       links.push({
-        title: t('Usage instructions'),
+        title: t('Docs'),
         href: docsLink,
         external: true,
       })
     } else {
-      links.push({ title: t('Usage instructions'), href: '/docs' })
+      links.push({ title: t('Docs'), href: '/docs' })
     }
   }
 
-  // About
-  if (modules?.about !== false) {
-    links.push({ title: t('Check usage'), href: '/about' })
+  if (modules?.pay !== false) {
+    links.push({
+      title: t('Mall'),
+      href: 'https://mall.aiday.top',
+      external: true,
+    })
+  }
+
+  if (modules?.banana !== false) {
+    links.push({
+      title: t('Nano Banana Pro'),
+      href: 'https://image.aiday.top',
+      external: true,
+    })
   }
 
   return links

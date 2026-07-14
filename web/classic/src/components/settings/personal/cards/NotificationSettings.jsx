@@ -799,9 +799,13 @@ const NotificationSettings = ({
                       handleFormChange('recordIpLog', value);
                     }
                   }}
-                  extraText={t(
-                    '开启后，仅"消费"和"错误"日志将记录您的客户端IP地址',
-                  )}
+                  extraText={
+                    isRecordIpLogForced
+                      ? `${t('强制要求')}：${t(
+                          '开启后，仅"消费"和"错误"日志将记录您的客户端IP地址',
+                        )}`
+                      : t('开启后，仅"消费"和"错误"日志将记录您的客户端IP地址')
+                  }
                 />
               </div>
             </TabPane>

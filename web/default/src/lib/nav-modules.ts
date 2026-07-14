@@ -29,6 +29,8 @@ export type HeaderNavModules = {
   rankings: ModuleAccess
   docs: boolean
   about: boolean
+  pay: boolean
+  banana: boolean
   [key: string]: boolean | ModuleAccess
 }
 
@@ -39,6 +41,8 @@ const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
   rankings: { enabled: true, requireAuth: false },
   docs: true,
   about: true,
+  pay: true,
+  banana: true,
 }
 
 const DEFAULTS: Record<HeaderNavModule, ModuleAccess> = {
@@ -132,6 +136,10 @@ export function parseHeaderNavModules(raw: unknown): HeaderNavModules {
       )
     }
   })
+
+  if (!Object.hasOwn(parsed, 'banana')) {
+    result.banana = result.home
+  }
 
   return result
 }

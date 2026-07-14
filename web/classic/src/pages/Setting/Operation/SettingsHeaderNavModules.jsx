@@ -44,6 +44,7 @@ function createDefaultHeaderNavModules() {
     docs: true,
     about: true,
     pay: true,
+    banana: true,
   };
 }
 
@@ -64,6 +65,14 @@ function normalizeHeaderNavModules(modules) {
           ...defaults.pricing,
           ...(normalized.pricing || {}),
         };
+
+  if (
+    modules &&
+    !Object.prototype.hasOwnProperty.call(modules, 'banana') &&
+    typeof modules.home === 'boolean'
+  ) {
+    normalized.banana = modules.home;
+  }
 
   return normalized;
 }
@@ -161,9 +170,9 @@ export default function SettingsHeaderNavModules(props) {
   // 模块配置数据
   const moduleConfigs = [
     {
-      key: 'home',
-      title: t('首页'),
-      description: t('用户主页，展示系统信息'),
+      key: 'banana',
+      title: t('香蕉生图'),
+      description: t('图像生成'),
     },
     {
       key: 'console',
@@ -189,7 +198,7 @@ export default function SettingsHeaderNavModules(props) {
     {
       key: 'pay',
       title: t('商城'),
-      description: t('管理员设置的外部商城链接'),
+      description: t('商城'),
     },
   ];
 

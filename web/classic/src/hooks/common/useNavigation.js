@@ -32,11 +32,20 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
       docs: true,
       about: true,
       pay: true,
+      banana: true,
     };
+
+    let bananaEnabled = defaultModules.banana;
+    if (typeof headerNavModules?.banana === 'boolean') {
+      bananaEnabled = headerNavModules.banana;
+    } else if (typeof headerNavModules?.home === 'boolean') {
+      bananaEnabled = headerNavModules.home;
+    }
 
     const modules = {
       ...defaultModules,
       ...(headerNavModules || {}),
+      banana: bananaEnabled,
       pricing:
         typeof headerNavModules?.pricing === 'object'
           ? {
@@ -81,7 +90,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
       },
       {
         text: t('香蕉生图'),
-        itemKey: 'home',
+        itemKey: 'banana',
         isExternal: true,
         externalLink: 'https://image.aiday.top',
         target: '_blank',

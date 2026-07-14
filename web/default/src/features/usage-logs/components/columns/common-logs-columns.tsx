@@ -93,6 +93,18 @@ function getGroupRatio(other: LogOtherData | null): number | null {
   return null
 }
 
+function getAdminTokenQuotaLabel(
+  log: UsageLog,
+  t: (key: string) => string
+): string | null {
+  if (!log.token_id) return null
+  if (log.display_unlimited_quota === true) return t('Unlimited Quota')
+  if (log.display_remain_quota != null) {
+    return `${t('Remaining quota')} ${formatLogQuota(log.display_remain_quota)}`
+  }
+  return t('Token deleted')
+}
+
 function splitQuotaDisplay(value: string): { prefix: string; amount: string } {
   const match = value.match(/^([^0-9+\-.,\s]+)(.+)$/)
   if (!match) return { prefix: '', amount: value }
@@ -549,7 +561,8 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
       if (!isDisplayableLogType(log.type)) return null
 
       const tokenName = log.token_name
-      if (!tokenName) return null
+      const quotaLabel = isAdmin ? getAdminTokenQuotaLabel(log, t) : null
+      if (!tokenName && !quotaLabel) return null
 
       const other = parseLogOther(log.other)
       const displayName = sensitiveVisible ? tokenName : '••••'
@@ -559,25 +572,27 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
 
       return (
         <div className='flex max-w-[200px] flex-col gap-0.5'>
-          <TooltipProvider delay={300}>
-            <Tooltip>
-              <TooltipTrigger render={<div className='max-w-full' />}>
-                <StatusBadge
-                  label={displayName}
-                  icon={KeyRound}
-                  copyText={sensitiveVisible ? tokenName : undefined}
-                  size='sm'
-                  showDot={false}
-                  className='border-border/60 bg-muted/30 text-foreground h-6 max-w-full gap-1.5 overflow-hidden rounded-md border px-2 py-0.5 [font-family:var(--font-body)]'
-                />
-              </TooltipTrigger>
-              {sensitiveVisible && tokenName.length > 16 && (
-                <TooltipContent side='top' className='max-w-xs break-all'>
-                  {tokenName}
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </TooltipProvider>
+          {tokenName ? (
+            <TooltipProvider delay={300}>
+              <Tooltip>
+                <TooltipTrigger render={<div className='max-w-full' />}>
+                  <StatusBadge
+                    label={displayName}
+                    icon={KeyRound}
+                    copyText={sensitiveVisible ? tokenName : undefined}
+                    size='sm'
+                    showDot={false}
+                    className='border-border/60 bg-muted/30 text-foreground h-6 max-w-full gap-1.5 overflow-hidden rounded-md border px-2 py-0.5 [font-family:var(--font-body)]'
+                  />
+                </TooltipTrigger>
+                {sensitiveVisible && tokenName.length > 16 ? (
+                  <TooltipContent side='top' className='max-w-xs break-all'>
+                    {tokenName}
+                  </TooltipContent>
+                ) : null}
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
           {(group || groupRatio != null) && (
             <span className='block max-w-full truncate text-xs leading-none'>
               {group ? (
@@ -597,6 +612,11 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
               ) : null}
             </span>
           )}
+          {quotaLabel ? (
+            <span className='text-muted-foreground block max-w-full truncate text-xs leading-none tabular-nums'>
+              {quotaLabel}
+            </span>
+          ) : null}
         </div>
       )
     },

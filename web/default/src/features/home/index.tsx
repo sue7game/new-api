@@ -88,6 +88,7 @@ export function Home() {
             sandbox='allow-forms allow-popups allow-popups-to-escape-sandbox allow-scripts allow-top-navigation-by-user-activation'
             onLoad={syncIframePreferences}
           />
+          <Footer />
         </PublicLayout>
       )
     }
@@ -103,6 +104,7 @@ export function Home() {
             content={content}
             className='custom-home-content'
           />
+          <Footer />
         </PublicLayout>
       )
     }
@@ -116,6 +118,7 @@ export function Home() {
             className='custom-home-content'
           />
         </div>
+        <Footer />
       </PublicLayout>
     )
   }

@@ -19,6 +19,7 @@ type UserBase struct {
 	Group    string `json:"group"`
 	Email    string `json:"email"`
 	Quota    int    `json:"quota"`
+	Role     int    `json:"role"`
 	Status   int    `json:"status"`
 	Username string `json:"username"`
 	Setting  string `json:"setting"`
@@ -31,6 +32,7 @@ func (user *UserBase) WriteContext(c *gin.Context) {
 	common.SetContextKey(c, constant.ContextKeyUserEmail, user.Email)
 	common.SetContextKey(c, constant.ContextKeyUserName, user.Username)
 	common.SetContextKey(c, constant.ContextKeyUserSetting, user.GetSetting())
+	c.Set("role", user.Role)
 }
 
 func (user *UserBase) GetSetting() dto.UserSetting {
@@ -91,6 +93,9 @@ func updateUserCache(user User) error {
 	if err := updateUserStatusCache(user.Id, user.Status == common.UserStatusEnabled); err != nil {
 		return err
 	}
+	if err := updateUserRoleCache(user.Id, user.Role); err != nil {
+		return err
+	}
 	if err := updateUserNameCache(user.Id, user.Username); err != nil {
 		return err
 	}
@@ -114,7 +119,9 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 
 	// Try getting from Redis first
 	userCache, err = cacheGetUserBase(userId)
-	if err == nil {
+	// Persisted users never authenticate with the guest role. A zero role here
+	// identifies cache entries written before UserBase included the Role field.
+	if err == nil && userCache.Role != common.RoleGuestUser && common.IsValidateRole(userCache.Role) {
 		return userCache, nil
 	}
 
@@ -130,6 +137,7 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 		Id:       user.Id,
 		Group:    user.Group,
 		Quota:    user.Quota,
+		Role:     user.Role,
 		Status:   user.Status,
 		Username: user.Username,
 		Setting:  user.Setting,
@@ -215,6 +223,13 @@ func updateUserStatusCache(userId int, status bool) error {
 		statusInt = common.UserStatusDisabled
 	}
 	return common.RedisHSetField(getUserCacheKey(userId), "Status", fmt.Sprintf("%d", statusInt))
+}
+
+func updateUserRoleCache(userId int, role int) error {
+	if !common.RedisEnabled {
+		return nil
+	}
+	return common.RedisHSetField(getUserCacheKey(userId), "Role", fmt.Sprintf("%d", role))
 }
 
 func updateUserQuotaCache(userId int, quota int) error {

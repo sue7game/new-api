@@ -49,7 +49,6 @@ import {
 } from './config'
 
 const headerNavSchema = z.object({
-  home: z.boolean(),
   console: z.boolean(),
   pricingEnabled: z.boolean(),
   pricingRequireAuth: z.boolean(),
@@ -57,6 +56,8 @@ const headerNavSchema = z.object({
   rankingsRequireAuth: z.boolean(),
   docs: z.boolean(),
   about: z.boolean(),
+  pay: z.boolean(),
+  banana: z.boolean(),
 })
 
 type HeaderNavFormValues = z.infer<typeof headerNavSchema>
@@ -67,8 +68,6 @@ type HeaderNavigationSectionProps = {
 }
 
 const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
-  home:
-    config.home === undefined ? HEADER_NAV_DEFAULT.home : Boolean(config.home),
   console:
     config.console === undefined
       ? HEADER_NAV_DEFAULT.console
@@ -95,6 +94,11 @@ const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
     config.about === undefined
       ? HEADER_NAV_DEFAULT.about
       : Boolean(config.about),
+  pay: config.pay === undefined ? HEADER_NAV_DEFAULT.pay : Boolean(config.pay),
+  banana:
+    config.banana === undefined
+      ? HEADER_NAV_DEFAULT.banana
+      : Boolean(config.banana),
 })
 
 export function HeaderNavigationSection({
@@ -117,10 +121,11 @@ export function HeaderNavigationSection({
   const onSubmit = async (values: HeaderNavFormValues) => {
     const payload: HeaderNavModulesConfig = {
       ...config,
-      home: values.home,
       console: values.console,
       docs: values.docs,
       about: values.about,
+      pay: values.pay,
+      banana: values.banana,
       pricing: {
         ...(config.pricing ?? HEADER_NAV_DEFAULT.pricing),
         enabled: values.pricingEnabled,
@@ -154,11 +159,6 @@ export function HeaderNavigationSection({
     description: string
   }> = [
     {
-      key: 'home',
-      title: t('Home'),
-      description: t('Landing page with system overview.'),
-    },
-    {
       key: 'console',
       title: t('Console'),
       description: t('User dashboard and quota controls.'),
@@ -172,6 +172,16 @@ export function HeaderNavigationSection({
       key: 'about',
       title: t('About'),
       description: t('Static page describing the platform.'),
+    },
+    {
+      key: 'pay',
+      title: t('Mall'),
+      description: t('External store link.'),
+    },
+    {
+      key: 'banana',
+      title: t('Nano Banana Pro'),
+      description: t('External image generation tool.'),
     },
   ]
 

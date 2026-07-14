@@ -76,6 +76,23 @@ function FooterLinkItem(props: { link: FooterLink }) {
   )
 }
 
+function ApiUsageDisclaimer(props: { className?: string }) {
+  const { t } = useTranslation()
+
+  return (
+    <p
+      className={cn(
+        'text-muted-foreground text-center text-xs leading-relaxed',
+        props.className
+      )}
+    >
+      {t(
+        'This API is intended for testing and evaluation only. Comply with local laws and do not use it for illegal purposes. The site assumes no legal liability.'
+      )}
+    </p>
+  )
+}
+
 // Renders User Agreement / Privacy Policy links inline with the parent's
 // copyright row when either is configured in System Settings → Site. Emits
 // fragmented siblings so the parent flex container's gap controls spacing.
@@ -241,6 +258,7 @@ export function Footer(props: FooterProps) {
               <ProjectAttribution currentYear={currentYear} inline />
             </div>
           </div>
+          <ApiUsageDisclaimer className='mt-3' />
         </div>
       </footer>
     )
@@ -302,6 +320,7 @@ export function Footer(props: FooterProps) {
           </div>
           <ProjectAttribution currentYear={currentYear} />
         </div>
+        <ApiUsageDisclaimer className='mt-4' />
       </div>
     </footer>
   )

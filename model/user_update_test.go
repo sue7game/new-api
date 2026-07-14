@@ -7,6 +7,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -110,6 +111,54 @@ func TestUpdateUserSettingAllowsRootToDisableIpLogging(t *testing.T) {
 	var got User
 	require.NoError(t, DB.First(&got, user.Id).Error)
 	assert.False(t, got.GetSetting().RecordIpLog)
+}
+
+func TestShouldRecordIpLogEnforcesRolePolicy(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	commonUser := User{
+		Id:       4,
+		Username: "common-ip-log-user",
+		Password: "password",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+		AffCode:  "common-ip-log-aff",
+	}
+	rootUser := User{
+		Id:       5,
+		Username: "root-ip-log-user",
+		Password: "password",
+		Role:     common.RoleRootUser,
+		Status:   common.UserStatusEnabled,
+		AffCode:  "root-ip-log-aff",
+	}
+	require.NoError(t, DB.Create(&commonUser).Error)
+	require.NoError(t, DB.Create(&rootUser).Error)
+
+	commonCache, err := GetUserCache(commonUser.Id)
+	require.NoError(t, err)
+	rootCache, err := GetUserCache(rootUser.Id)
+	require.NoError(t, err)
+
+	commonContext, _ := gin.CreateTestContext(nil)
+	commonCache.WriteContext(commonContext)
+	rootContext, _ := gin.CreateTestContext(nil)
+	rootCache.WriteContext(rootContext)
+	assert.Equal(t, common.RoleCommonUser, commonContext.GetInt("role"))
+	assert.Equal(t, common.RoleRootUser, rootContext.GetInt("role"))
+
+	assert.True(t, shouldRecordIpLog(commonContext, commonUser.Id))
+	assert.False(t, shouldRecordIpLog(rootContext, rootUser.Id))
+	assert.True(t, shouldRecordIpLog(nil, commonUser.Id))
+	emptyContext, _ := gin.CreateTestContext(nil)
+	assert.False(t, shouldRecordIpLog(emptyContext, rootUser.Id))
+
+	require.NoError(t, UpdateUserSetting(rootUser.Id, dto.UserSetting{RecordIpLog: true}))
+	updatedRootCache, err := GetUserCache(rootUser.Id)
+	require.NoError(t, err)
+	updatedRootContext, _ := gin.CreateTestContext(nil)
+	updatedRootCache.WriteContext(updatedRootContext)
+	assert.True(t, shouldRecordIpLog(updatedRootContext, rootUser.Id))
 }
 
 func TestEnsureEmailAvailableRejectsExistingEmailCaseInsensitive(t *testing.T) {

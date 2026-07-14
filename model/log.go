@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/types"
 
@@ -120,6 +122,7 @@ func assignDisplayLogIds(logs []*Log, startIdx int) {
 
 func formatUserLogs(logs []*Log, startIdx int) {
 	for i := range logs {
+		logs[i].ChannelId = 0
 		logs[i].ChannelName = ""
 		var otherMap map[string]interface{}
 		otherMap, _ = common.StrToMap(logs[i].Other)
@@ -129,6 +132,10 @@ func formatUserLogs(logs []*Log, startIdx int) {
 			delete(otherMap, "reject_reason")
 			delete(otherMap, "is_model_mapped")
 			delete(otherMap, "upstream_model_name")
+			delete(otherMap, "po")
+			delete(otherMap, "channel_id")
+			delete(otherMap, "channel_name")
+			delete(otherMap, "channel_type")
 			// Remove operation-audit details (operator/route info), admin-only.
 			delete(otherMap, "audit_info")
 			// delete(otherMap, "reject_reason")
@@ -294,7 +301,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	otherStr := common.MapToJsonStr(other)
-	needRecordIp := shouldRecordIpLog(userId)
+	needRecordIp := shouldRecordIpLog(c, userId)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
@@ -327,18 +334,42 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	}
 }
 
-func shouldRecordIpLog(userId int) bool {
+func shouldRecordIpLog(c *gin.Context, userId int) bool {
 	if userId <= 0 {
 		return false
 	}
-	if settingMap, err := GetUserSetting(userId, false); err == nil && settingMap.RecordIpLog {
-		return true
+	if c != nil {
+		contextRole, exists := c.Get("role")
+		role, validRole := contextRole.(int)
+		if exists && validRole && role != common.RoleGuestUser && common.IsValidateRole(role) {
+			if role != common.RoleRootUser {
+				return true
+			}
+			if userSetting, ok := common.GetContextKeyType[dto.UserSetting](c, constant.ContextKeyUserSetting); ok {
+				return userSetting.RecordIpLog
+			}
+			settingMap, err := GetUserSetting(userId, false)
+			if err != nil {
+				common.SysError("failed to load root user IP log setting: " + err.Error())
+				return false
+			}
+			return settingMap.RecordIpLog
+		}
 	}
 	role, err := GetUserRole(userId)
 	if err != nil {
+		common.SysError("failed to load user role for IP log policy: " + err.Error())
 		return false
 	}
-	return role != common.RoleRootUser
+	if role != common.RoleRootUser {
+		return true
+	}
+	settingMap, err := GetUserSetting(userId, false)
+	if err != nil {
+		common.SysError("failed to load root user IP log setting: " + err.Error())
+		return false
+	}
+	return settingMap.RecordIpLog
 }
 
 type RecordConsumeLogParams struct {
@@ -366,7 +397,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
 	otherStr := common.MapToJsonStr(params.Other)
-	needRecordIp := shouldRecordIpLog(userId)
+	needRecordIp := shouldRecordIpLog(c, userId)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
@@ -477,58 +508,33 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 
 type tokenQuotaSnapshot struct {
 	Id             int  `gorm:"column:id"`
-	UserId         int  `gorm:"column:user_id"`
 	RemainQuota    int  `gorm:"column:remain_quota"`
 	UsedQuota      int  `gorm:"column:used_quota"`
 	UnlimitedQuota bool `gorm:"column:unlimited_quota"`
 }
 
-type userQuotaSnapshot struct {
-	Id    int `gorm:"column:id"`
-	Role  int `gorm:"column:role"`
-	Quota int `gorm:"column:quota"`
-}
-
-func loadTokenQuotaSnapshots(tokenIds []int) (map[int]tokenQuotaSnapshot, []int, error) {
+func loadTokenQuotaSnapshots(tokenIds []int) (map[int]tokenQuotaSnapshot, error) {
 	var tokens []tokenQuotaSnapshot
 	if err := DB.Model(&Token{}).
-		Select("id, user_id, remain_quota, used_quota, unlimited_quota").
+		Select("id, remain_quota, used_quota, unlimited_quota").
 		Where("id IN ?", tokenIds).
 		Find(&tokens).Error; err != nil {
-		return nil, nil, err
-	}
-
-	userIds := types.NewSet[int]()
-	tokenMap := make(map[int]tokenQuotaSnapshot, len(tokens))
-	for _, token := range tokens {
-		tokenMap[token.Id] = token
-		if token.UserId > 0 {
-			userIds.Add(token.UserId)
-		}
-	}
-	return tokenMap, userIds.Items(), nil
-}
-
-func loadUserQuotaSnapshots(userIds []int) (map[int]userQuotaSnapshot, error) {
-	userMap := make(map[int]userQuotaSnapshot, len(userIds))
-	if len(userIds) == 0 {
-		return userMap, nil
-	}
-
-	var users []userQuotaSnapshot
-	if err := DB.Model(&User{}).
-		Select("id, role, quota").
-		Where("id IN ?", userIds).
-		Find(&users).Error; err != nil {
 		return nil, err
 	}
-	for _, user := range users {
-		userMap[user.Id] = user
+
+	tokenMap := make(map[int]tokenQuotaSnapshot, len(tokens))
+	for _, token := range tokens {
+		if common.BatchUpdateEnabled {
+			pendingDelta := getPendingBatchUpdate(BatchUpdateTypeTokenQuota, token.Id)
+			token.RemainQuota += pendingDelta
+			token.UsedQuota -= pendingDelta
+		}
+		tokenMap[token.Id] = token
 	}
-	return userMap, nil
+	return tokenMap, nil
 }
 
-func applyCurrentTokenQuota(logs []*Log, tokenMap map[int]tokenQuotaSnapshot, userMap map[int]userQuotaSnapshot) {
+func applyCurrentTokenQuota(logs []*Log, tokenMap map[int]tokenQuotaSnapshot) {
 	for _, log := range logs {
 		token, ok := tokenMap[log.TokenId]
 		if !ok {
@@ -540,15 +546,6 @@ func applyCurrentTokenQuota(logs []*Log, tokenMap map[int]tokenQuotaSnapshot, us
 		log.TokenRemainQuota = &remainQuota
 		log.TokenUsedQuota = &usedQuota
 		log.TokenUnlimitedQuota = &unlimitedQuota
-
-		user, ok := userMap[token.UserId]
-		if ok && user.Role < common.RoleAdminUser {
-			displayRemainQuota := user.Quota
-			displayUnlimited := false
-			log.DisplayRemainQuota = &displayRemainQuota
-			log.DisplayUnlimited = &displayUnlimited
-			continue
-		}
 		log.DisplayRemainQuota = &remainQuota
 		log.DisplayUnlimited = &unlimitedQuota
 	}
@@ -565,15 +562,11 @@ func hydrateCurrentTokenQuota(logs []*Log) error {
 		return nil
 	}
 
-	tokenMap, userIds, err := loadTokenQuotaSnapshots(tokenIds.Items())
+	tokenMap, err := loadTokenQuotaSnapshots(tokenIds.Items())
 	if err != nil {
 		return err
 	}
-	userMap, err := loadUserQuotaSnapshots(userIds)
-	if err != nil {
-		return err
-	}
-	applyCurrentTokenQuota(logs, tokenMap, userMap)
+	applyCurrentTokenQuota(logs, tokenMap)
 	return nil
 }
 

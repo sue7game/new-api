@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,8 +41,12 @@ func TestFormatUserLogsStripsPrivateRelayMetadata(t *testing.T) {
 		"reject_reason":       "provider policy",
 		"is_model_mapped":     true,
 		"upstream_model_name": "provider-model",
+		"po":                  map[string]interface{}{"system": "private prompt"},
+		"channel_id":          12,
+		"channel_name":        "private-channel",
+		"channel_type":        1,
 	})
-	logs := []*Log{{Other: other}}
+	logs := []*Log{{ChannelId: 12, ChannelName: "private-channel", Other: other}}
 
 	formatUserLogs(logs, 0)
 
@@ -51,4 +56,10 @@ func TestFormatUserLogsStripsPrivateRelayMetadata(t *testing.T) {
 	require.NotContains(t, parsed, "reject_reason")
 	require.NotContains(t, parsed, "is_model_mapped")
 	require.NotContains(t, parsed, "upstream_model_name")
+	require.NotContains(t, parsed, "po")
+	require.NotContains(t, parsed, "channel_id")
+	require.NotContains(t, parsed, "channel_name")
+	require.NotContains(t, parsed, "channel_type")
+	assert.Zero(t, logs[0].ChannelId)
+	assert.Empty(t, logs[0].ChannelName)
 }

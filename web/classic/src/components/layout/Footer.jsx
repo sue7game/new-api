@@ -228,24 +228,31 @@ const FooterBar = () => {
     <div className='w-full'>
       {footer ? (
         <footer className='relative h-auto py-4 px-6 md:px-24 w-full flex items-center justify-center overflow-hidden'>
-          <div className='flex flex-col md:flex-row items-center justify-between w-full max-w-[1110px] gap-4'>
-            <div
-              className='custom-footer na-cb6feafeb3990c78 text-sm !text-semi-color-text-1'
-              dangerouslySetInnerHTML={{ __html: footer }}
-            ></div>
-            <div className='text-sm flex-shrink-0'>
-              <span className='!text-semi-color-text-1'>
-                {t('设计与开发由')}{' '}
-              </span>
-              <a
-                href='https://github.com/QuantumNous/new-api'
-                target='_blank'
-                rel='noopener noreferrer'
-                className='!text-semi-color-primary font-medium'
-              >
-                New API
-              </a>
+          <div className='flex w-full max-w-[1110px] flex-col items-center gap-3'>
+            <div className='flex w-full flex-col items-center justify-between gap-4 md:flex-row'>
+              <div
+                className='custom-footer na-cb6feafeb3990c78 text-sm !text-semi-color-text-1'
+                dangerouslySetInnerHTML={{ __html: footer }}
+              ></div>
+              <div className='text-sm flex-shrink-0'>
+                <span className='!text-semi-color-text-1'>
+                  {t('设计与开发由')}{' '}
+                </span>
+                <a
+                  href='https://github.com/QuantumNous/new-api'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='!text-semi-color-primary font-medium'
+                >
+                  New API
+                </a>
+              </div>
             </div>
+            <Typography.Text className='text-xs !text-semi-color-text-2 text-center'>
+              {t(
+                '本站API适用于测试和体验目的，请自觉遵守您当地法律法规，切勿用于非法用途，本站不承担任何法律责任。',
+              )}
+            </Typography.Text>
           </div>
         </footer>
       ) : (

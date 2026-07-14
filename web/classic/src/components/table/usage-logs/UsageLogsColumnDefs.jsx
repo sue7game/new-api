@@ -637,16 +637,18 @@ export const getLogsColumns = ({
           record.type === 5 ||
           record.type === 6 ? (
           <div>
-            <Tag
-              color='grey'
-              shape='circle'
-              onClick={(event) => {
-                copyText(event, text);
-              }}
-            >
-              {' '}
-              {t(text)}{' '}
-            </Tag>
+            {text ? (
+              <Tag
+                color='grey'
+                shape='circle'
+                onClick={(event) => {
+                  copyText(event, text);
+                }}
+              >
+                {' '}
+                {t(text)}{' '}
+              </Tag>
+            ) : null}
             {adminTokenQuota ? (
               <Typography.Text className='mt-1 block !text-xs !text-semi-color-text-2'>
                 {adminTokenQuota}
