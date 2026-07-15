@@ -85,25 +85,25 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // About
   if (modules?.about !== false) {
-    links.push({ title: t('About'), href: '/about' })
+    links.push({ title: t('Lookup'), href: '/about' })
   }
 
   // Docs (supports external links)
   if (modules?.docs !== false) {
     if (docsLink) {
       links.push({
-        title: t('Docs'),
+        title: t('Instructions'),
         href: docsLink,
         external: true,
       })
     } else {
-      links.push({ title: t('Docs'), href: '/docs' })
+      links.push({ title: t('Instructions'), href: '/docs' })
     }
   }
 
   if (modules?.pay !== false) {
     links.push({
-      title: t('Mall'),
+      title: t('Top Up'),
       href: 'https://mall.aiday.top',
       external: true,
     })
@@ -111,8 +111,16 @@ export function useTopNavLinks(): TopNavLink[] {
 
   if (modules?.banana !== false) {
     links.push({
-      title: t('Nano Banana Pro'),
+      title: t('Image Generator'),
       href: 'https://image.aiday.top',
+      external: true,
+    })
+  }
+
+  if (modules?.docs !== false) {
+    links.push({
+      title: t('Documentation'),
+      href: 'https://docs.newapi.pro/zh',
       external: true,
     })
   }

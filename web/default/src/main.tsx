@@ -34,6 +34,7 @@ import { applyFaviconToDom } from '@/lib/dom-utils'
 import '@/lib/dayjs'
 import { initializeFrontendCache } from '@/lib/frontend-cache'
 import { handleServerError } from '@/lib/handle-server-error'
+import { normalizeSystemName } from '@/lib/system-name'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { DirectionProvider } from './context/direction-provider'
@@ -133,7 +134,7 @@ const rootElement = document.getElementById('root')!
       const saved = localStorage.getItem('status')
       if (saved) {
         const s = JSON.parse(saved)
-        if (s?.system_name) apply(s.system_name)
+        if (s?.system_name) apply(normalizeSystemName(s.system_name))
         if (s?.logo) applyFaviconToDom(s.logo)
       }
     } catch {
@@ -143,7 +144,7 @@ const rootElement = document.getElementById('root')!
     getStatus()
       .then((s) => {
         if (s?.system_name) {
-          apply(s.system_name as string)
+          apply(normalizeSystemName(s.system_name))
           try {
             localStorage.setItem('status', JSON.stringify(s))
           } catch {

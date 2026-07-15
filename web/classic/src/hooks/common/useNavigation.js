@@ -67,14 +67,14 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         to: '/pricing',
       },
       {
-        text: t('关于'),
+        text: t('查询'),
         itemKey: 'about',
         to: '/about',
       },
       ...(docsLink
         ? [
             {
-              text: t('文档'),
+              text: t('说明'),
               itemKey: 'docs',
               isExternal: true,
               externalLink: docsLink,
@@ -82,25 +82,32 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
           ]
         : []),
       {
-        text: t('商城'),
+        text: t('充值'),
         itemKey: 'pay',
         isExternal: true,
         externalLink: 'https://mall.aiday.top',
         target: '_blank',
       },
       {
-        text: t('香蕉生图'),
+        text: t('生图'),
         itemKey: 'banana',
         isExternal: true,
         externalLink: 'https://image.aiday.top',
+        target: '_blank',
+      },
+      {
+        text: t('文档'),
+        itemKey: 'apiDocs',
+        isExternal: true,
+        externalLink: 'https://docs.newapi.pro/zh',
         target: '_blank',
       },
     ];
 
     // 根据配置过滤导航链接
     return allLinks.filter((link) => {
-      if (link.itemKey === 'docs') {
-        return docsLink && modules.docs;
+      if (link.itemKey === 'docs' || link.itemKey === 'apiDocs') {
+        return modules.docs && (link.itemKey === 'apiDocs' || docsLink);
       }
       if (link.itemKey === 'pricing') {
         // 支持新的pricing配置格式
